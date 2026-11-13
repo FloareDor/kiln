@@ -1,0 +1,320 @@
+{
+  "uid": "kiln-overview",
+  "title": "Kiln — LLM serving",
+  "description": "Four rows, top to bottom: what clients experience, what the GPU is doing, what the tiering scheduler decided, and what routing achieved. The ordering is deliberate — a latency spike in row 1 should be explainable by rows 2 and 3 without leaving the page.",
+  "tags": ["kiln", "llm", "vllm"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-30m", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "model",
+        "label": "Model",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${DS}" },
+        "query": "label_values(kiln_requests_total, model)",
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" },
+        "refresh": 2
+      },
+      {
+        "name": "team",
+        "label": "Team",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${DS}" },
+        "query": "label_values(kiln_requests_total, team)",
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" },
+        "refresh": 2
+      },
+      {
+        "name": "DS",
+        "label": "Datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "Prometheus" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Client experience",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Time to first token",
+      "description": "The headline metric. A wake costs several hundred milliseconds and is plainly visible here while being almost invisible in end-to-end latency for a long generation, which is why TTFT is tracked separately.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2, "fillOpacity": 5, "showPoints": "never" }
+        }
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] } },
+      "targets": [
+        {
+          "refId": "p50",
+          "legendFormat": "p50",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(kiln_ttft_seconds_bucket{model=~\"$model\", team=~\"$team\"}[2m])))"
+        },
+        {
+          "refId": "p95",
+          "legendFormat": "p95",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(kiln_ttft_seconds_bucket{model=~\"$model\", team=~\"$team\"}[2m])))"
+        },
+        {
+          "refId": "p99",
+          "legendFormat": "p99",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(kiln_ttft_seconds_bucket{model=~\"$model\", team=~\"$team\"}[2m])))"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Request rate by outcome",
+      "description": "Status classes rather than raw codes: raw codes are a cardinality trap if an upstream starts returning a long tail of them.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "lineWidth": 2, "fillOpacity": 25, "stacking": { "mode": "normal" } }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "5xx" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] },
+          { "matcher": { "id": "byName", "options": "429" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }] },
+          { "matcher": { "id": "byName", "options": "2xx" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{status}}",
+          "expr": "sum by (status) (rate(kiln_requests_total{model=~\"$model\", team=~\"$team\"}[2m]))"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Output throughput",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 9 },
+      "fieldConfig": { "defaults": { "unit": "none", "custom": { "lineWidth": 2, "fillOpacity": 10 } } },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{model}} tokens/s",
+          "expr": "sum by (model) (rate(kiln_tokens_total{kind=\"completion\", model=~\"$model\"}[2m]))"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Queue depth and wait",
+      "description": "Where a wake becomes visible to the client: with tiering, a request for a sleeping model waits here instead of failing.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 9 },
+      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10 } } },
+      "targets": [
+        { "refId": "A", "legendFormat": "{{model}} depth",
+          "expr": "sum by (model) (kiln_queue_depth{model=~\"$model\"})" },
+        { "refId": "B", "legendFormat": "{{model}} p95 wait (s)",
+          "expr": "histogram_quantile(0.95, sum by (le, model) (rate(kiln_queue_wait_seconds_bucket{model=~\"$model\"}[2m])))" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Quota rejections",
+      "description": "Labelled by which limit fired, so a 429 spike can be attributed rather than guessed at.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 9 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 2, "fillOpacity": 20 } } },
+      "targets": [
+        { "refId": "A", "legendFormat": "{{team}} / {{reason}}",
+          "expr": "sum by (team, reason) (rate(kiln_quota_rejections_total{team=~\"$team\"}[2m]))" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "GPU and host memory",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "GPU memory",
+      "description": "The budget the scheduler places against. Used approaching total is what triggers eviction.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes", "custom": { "lineWidth": 2, "fillOpacity": 10 } },
+        "overrides": [
+          { "matcher": { "id": "byRegexp", "options": ".*total.*" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "text" } },
+              { "id": "custom.fillOpacity", "value": 0 },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [8, 4] } }
+            ] }
+        ]
+      },
+      "targets": [
+        { "refId": "A", "legendFormat": "{{node}}/{{device}} {{kind}}",
+          "expr": "kiln_gpu_memory_bytes{kind=~\"used|total\"}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Models by state",
+      "description": "The tiering picture at a glance: how many models are resident, parked in host RAM, dropped to disk, or in transition.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "fieldConfig": {
+        "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 35, "stacking": { "mode": "normal" }, "showPoints": "never" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "ACTIVE" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
+          { "matcher": { "id": "byName", "options": "SLEEPING_L1" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }] },
+          { "matcher": { "id": "byName", "options": "SLEEPING_L2" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "purple" } }] },
+          { "matcher": { "id": "byName", "options": "FAILED" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] }
+        ]
+      },
+      "targets": [
+        { "refId": "A", "legendFormat": "{{state}}", "expr": "sum by (state) (kiln_models_by_state)" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Tiering scheduler",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Residency hit ratio",
+      "description": "Fraction of requests that found their model already in VRAM. The clearest single measure of whether the eviction policy is working.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 6, "w": 5, "x": 0, "y": 26 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit", "min": 0, "max": 1,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "red", "value": null },
+            { "color": "orange", "value": 0.7 },
+            { "color": "green", "value": 0.9 }
+          ] }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        { "refId": "A",
+          "expr": "sum(rate(kiln_residency_hits_total[5m])) / clamp_min(sum(rate(kiln_residency_hits_total[5m])) + sum(rate(kiln_residency_misses_total[5m])), 0.0001)" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Thrash events",
+      "description": "Evictions of a model that was resident for less than the minimum residency. Should be zero by construction; non-zero means the anti-thrash guard has a hole.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 6, "w": 5, "x": 5, "y": 26 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "red", "value": 1 }
+          ] }
+        }
+      },
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        { "refId": "A", "expr": "sum(increase(kiln_thrash_total[$__range]))" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Swap duration by transition",
+      "description": "host→gpu is a level-1 wake, disk→gpu a level-2 wake with its weight reload, none→gpu a full cold start. The gaps between these three lines are the argument for tiering.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 6, "w": 14, "x": 10, "y": 26 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 2, "fillOpacity": 5 } } },
+      "targets": [
+        { "refId": "A", "legendFormat": "{{from}} → {{to}} p95",
+          "expr": "histogram_quantile(0.95, sum by (le, from, to) (rate(kiln_swap_duration_seconds_bucket[5m])))" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Evictions, wakes and cold starts",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 32 },
+      "fieldConfig": { "defaults": { "unit": "cpm", "custom": { "lineWidth": 2, "fillOpacity": 15 } } },
+      "targets": [
+        { "refId": "A", "legendFormat": "evict → {{to}}",
+          "expr": "sum by (to) (rate(kiln_evictions_total[2m]) * 60)" },
+        { "refId": "B", "legendFormat": "wake ← {{from}}",
+          "expr": "sum by (from) (rate(kiln_wakes_total[2m]) * 60)" },
+        { "refId": "C", "legendFormat": "cold start",
+          "expr": "sum(rate(kiln_cold_starts_total[2m]) * 60)" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Drain timeouts and swap failures",
+      "description": "A drain timeout means a victim was slept with requests still in flight. Rare is acceptable; sustained means the drain deadline is too tight for the workload.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 32 },
+      "fieldConfig": { "defaults": { "unit": "cpm", "custom": { "lineWidth": 2, "fillOpacity": 25 } } },
+      "targets": [
+        { "refId": "A", "legendFormat": "drain timeout {{model}}",
+          "expr": "sum by (model) (rate(kiln_drain_timeouts_total[5m]) * 60)" },
+        { "refId": "B", "legendFormat": "swap failure {{op}}",
+          "expr": "sum by (op) (rate(kiln_swap_failures_total[5m]) * 60)" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Routing",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 39 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Prefix hit ratio",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 40 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        { "refId": "A", "legendFormat": "{{router}}",
+          "expr": "sum by (router) (rate(kiln_prefix_hits_total[5m])) / clamp_min(sum by (router) (rate(kiln_prefix_hits_total[5m])) + sum by (router) (rate(kiln_prefix_misses_total[5m])), 0.0001)" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "In-flight requests per replica",
+      "description": "Also the drain signal: a model is safe to sleep only once every one of its replicas reaches zero. A persistent hot replica is what a load penalty on the prefix router is meant to fix.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 6, "w": 18, "x": 6, "y": 40 },
+      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10 } } },
+      "targets": [
+        { "refId": "A", "legendFormat": "{{model}} / {{replica}}",
+          "expr": "kiln_inflight_requests{model=~\"$model\"}" }
+      ]
+    }
+  ]
+}

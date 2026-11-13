@@ -100,11 +100,16 @@ cluster: ## Start a local GPU-enabled minikube cluster
 
 .PHONY: up
 up: images ## Deploy the whole stack to the current cluster
-	@# Load images into minikube's daemon rather than pushing to a registry; without
-	@# this the pods sit in ImagePullBackOff looking for kiln/gateway on Docker Hub.
-	-minikube image load kiln/nodeagent:dev kiln/gateway:dev kiln/controlplane:dev
+	@# Images go in over SSH rather than via `minikube image load`: that command
+	@# shells out to wmic to translate a drive letter into a volume name, and wmic
+	@# was removed from Windows 11.
+	bash scripts/load_images.sh kiln/gateway:dev kiln/controlplane:dev kiln/nodeagent:dev
 	kubectl apply -f deploy/k8s/kiln.yaml
 	kubectl apply -f deploy/k8s/monitoring.yaml
+	@# The dashboard is committed as JSON and provisioned from a ConfigMap, so the
+	@# Grafana view in the README is reproducible rather than hand-built.
+	kubectl -n kiln create configmap grafana-dashboards 	  --from-file=kiln.json=dashboards/kiln.json 	  --dry-run=client -o yaml | kubectl apply -f -
+	-kubectl -n kiln rollout restart deploy/grafana
 	kubectl -n kiln rollout status deploy/kiln-gateway --timeout=300s
 	kubectl -n kiln rollout status deploy/kiln-controlplane --timeout=300s
 	kubectl -n kiln rollout status ds/kiln-nodeagent --timeout=600s
