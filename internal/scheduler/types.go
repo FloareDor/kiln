@@ -199,6 +199,12 @@ type Model struct {
 	// LastRequest is when a request for this model last arrived, used by LRU and to
 	// decide whether a sleeper is worth keeping in host RAM.
 	LastRequest time.Time
+	// TransitionAt is when the model entered its current transitional state
+	// (STARTING, WAKING, DRAINING). It is how a transition that never completes is
+	// detected: such a model counts against the VRAM budget, is never evictable, and
+	// is never servable, so left unbounded it holds memory hostage forever.
+	TransitionAt time.Time
+
 	// ResidentSince is when the model last entered ACTIVE. Anti-thrash uses it: a
 	// model that has been serving for less than Config.MinResidency is not evictable.
 	ResidentSince time.Time

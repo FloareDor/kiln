@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -225,6 +226,9 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, body []byte, mode
 		if errors.Is(err, context.DeadlineExceeded) {
 			status, code = http.StatusGatewayTimeout, "model_wake_timeout"
 		}
+		// Log the reason. A 503 with no explanation on the server side makes a
+		// failing benchmark run unexplainable, which cost several investigations.
+		s.Log.Warn("could not make model servable", "model", model, "status", status, "err", err)
 		WriteError(w, status, "server_error", code, err.Error())
 		s.Obs.RequestDone(model, team, "", &Result{Status: status}, err)
 		return
@@ -233,6 +237,8 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, body []byte, mode
 
 	up, replicaID, err := s.pick(model, prompt)
 	if err != nil {
+		s.Log.Warn("no routable replica after the model was made servable",
+			"model", model, "err", err, "replicas", s.describeReplicas(model))
 		WriteError(w, http.StatusServiceUnavailable, "server_error", "no_replica", err.Error())
 		s.Obs.RequestDone(model, team, "", &Result{Status: http.StatusServiceUnavailable}, err)
 		return
@@ -268,6 +274,23 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, body []byte, mode
 	}
 	s.Router.Observe(routing.Request{Model: model, PrefixBlocks: blocks(prompt)}, replicaID)
 	s.Obs.RequestDone(model, team, replicaID, res, nil)
+}
+
+// describeReplicas renders a model's replicas for a diagnostic log line: which exist,
+// what state each is in, and whether the concurrency cap is what made it unroutable.
+func (s *Server) describeReplicas(model string) []string {
+	reps := s.Reg.Replicas(model)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]string, 0, len(reps))
+	for _, r := range reps {
+		out = append(out, fmt.Sprintf("%s=%s ready=%t inflight=%d",
+			r.ID, r.State, r.Ready, s.inflight[r.ID]))
+	}
+	if len(out) == 0 {
+		return []string{"none registered"}
+	}
+	return out
 }
 
 func blocks(prompt string) []uint64 {

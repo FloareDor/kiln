@@ -1,20 +1,20 @@
-{"_meta": {"seed": 20261113, "duration": 600.0, "rate": 1.0, "teams": ["team-a", "team-b", "team-c"], "models": ["q05a", "q06", "q05b", "q15"], "kind": "zipf", "skew": 1.0}}
+{"_meta": {"seed": 20261113, "duration": 600.0, "rate": 1.0, "teams": ["team-a", "team-b", "team-c"], "models": ["q05a", "q06", "q05b", "q05c"], "kind": "zipf", "skew": 1.0}}
 {"t": 1.5859909758470565, "model": "q05a", "team": "team-a", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-0", "turn": 0}
 {"t": 2.5376814946028823, "model": "q05a", "team": "team-b", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-1", "turn": 0}
 {"t": 3.661767344397427, "model": "q05a", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-2", "turn": 0}
 {"t": 3.9097904923263282, "model": "q06", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-3", "turn": 0}
-{"t": 4.349795860101951, "model": "q15", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-4", "turn": 0}
+{"t": 4.349795860101951, "model": "q05c", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-4", "turn": 0}
 {"t": 4.846474289718338, "model": "q05a", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-5", "turn": 0}
 {"t": 7.282465216333746, "model": "q05a", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-6", "turn": 0}
 {"t": 8.191917957743081, "model": "q05b", "team": "team-b", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-7", "turn": 0}
 {"t": 8.977480906234751, "model": "q05a", "team": "team-c", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-8", "turn": 0}
 {"t": 9.165922397826474, "model": "q06", "team": "team-a", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-9", "turn": 0}
-{"t": 10.89639485238775, "model": "q15", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-10", "turn": 0}
+{"t": 10.89639485238775, "model": "q05c", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-10", "turn": 0}
 {"t": 11.51073629719014, "model": "q05a", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-11", "turn": 0}
 {"t": 12.692283427443726, "model": "q05a", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-12", "turn": 0}
 {"t": 13.935186174197957, "model": "q05a", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-13", "turn": 0}
 {"t": 13.983076152749586, "model": "q05a", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-14", "turn": 0}
-{"t": 14.777934627405052, "model": "q15", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-15", "turn": 0}
+{"t": 14.777934627405052, "model": "q05c", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-15", "turn": 0}
 {"t": 15.471699712120767, "model": "q05a", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-16", "turn": 0}
 {"t": 15.564799925213038, "model": "q06", "team": "team-c", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-17", "turn": 0}
 {"t": 18.49833505542942, "model": "q05a", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-18", "turn": 0}
@@ -36,10 +36,10 @@
 {"t": 34.93762536523653, "model": "q05b", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-34", "turn": 0}
 {"t": 34.945097286188584, "model": "q06", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-35", "turn": 0}
 {"t": 35.725394534707256, "model": "q05a", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-36", "turn": 0}
-{"t": 37.722818146778955, "model": "q15", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-37", "turn": 0}
+{"t": 37.722818146778955, "model": "q05c", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-37", "turn": 0}
 {"t": 38.31618276614745, "model": "q05a", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-38", "turn": 0}
 {"t": 39.39000364772968, "model": "q06", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-39", "turn": 0}
-{"t": 39.40015323090957, "model": "q15", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-40", "turn": 0}
+{"t": 39.40015323090957, "model": "q05c", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-40", "turn": 0}
 {"t": 39.88684325977774, "model": "q05a", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-41", "turn": 0}
 {"t": 40.4657969809575, "model": "q05a", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-42", "turn": 0}
 {"t": 40.67755535525629, "model": "q05b", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-43", "turn": 0}
@@ -49,14 +49,14 @@
 {"t": 45.42244102418033, "model": "q06", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-47", "turn": 0}
 {"t": 47.39704909369474, "model": "q05b", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-48", "turn": 0}
 {"t": 47.8068204420565, "model": "q05a", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-49", "turn": 0}
-{"t": 48.554688792597595, "model": "q15", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-50", "turn": 0}
+{"t": 48.554688792597595, "model": "q05c", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-50", "turn": 0}
 {"t": 48.88575427635594, "model": "q06", "team": "team-a", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-51", "turn": 0}
 {"t": 48.95140050197929, "model": "q05a", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-52", "turn": 0}
 {"t": 49.388805486998926, "model": "q05b", "team": "team-c", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-53", "turn": 0}
 {"t": 50.49730434881618, "model": "q05a", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-54", "turn": 0}
 {"t": 50.87316270905015, "model": "q05b", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-55", "turn": 0}
 {"t": 52.56039727083298, "model": "q05a", "team": "team-c", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-56", "turn": 0}
-{"t": 53.537258189136665, "model": "q15", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-57", "turn": 0}
+{"t": 53.537258189136665, "model": "q05c", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-57", "turn": 0}
 {"t": 54.12106034587438, "model": "q05a", "team": "team-b", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-58", "turn": 0}
 {"t": 54.22018171061145, "model": "q06", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-59", "turn": 0}
 {"t": 54.797963741783896, "model": "q05a", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-60", "turn": 0}
@@ -68,9 +68,9 @@
 {"t": 61.66901233429968, "model": "q05a", "team": "team-a", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-66", "turn": 0}
 {"t": 62.486936832108064, "model": "q06", "team": "team-b", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-67", "turn": 0}
 {"t": 64.85909555463067, "model": "q05a", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-68", "turn": 0}
-{"t": 66.05806056419267, "model": "q15", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-69", "turn": 0}
+{"t": 66.05806056419267, "model": "q05c", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-69", "turn": 0}
 {"t": 66.33480055944186, "model": "q06", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-70", "turn": 0}
-{"t": 69.88048255549242, "model": "q15", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-71", "turn": 0}
+{"t": 69.88048255549242, "model": "q05c", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-71", "turn": 0}
 {"t": 72.03331181582098, "model": "q05a", "team": "team-a", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-72", "turn": 0}
 {"t": 73.10290785022086, "model": "q05a", "team": "team-b", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-73", "turn": 0}
 {"t": 73.74698848179796, "model": "q05a", "team": "team-c", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-74", "turn": 0}
@@ -82,10 +82,10 @@
 {"t": 77.46041788273645, "model": "q05b", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-80", "turn": 0}
 {"t": 78.26108165096008, "model": "q05a", "team": "team-a", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-81", "turn": 0}
 {"t": 78.2993635336447, "model": "q05a", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-82", "turn": 0}
-{"t": 80.78229313376308, "model": "q15", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-83", "turn": 0}
+{"t": 80.78229313376308, "model": "q05c", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-83", "turn": 0}
 {"t": 81.31332286917825, "model": "q06", "team": "team-a", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-84", "turn": 0}
 {"t": 82.0085838255985, "model": "q05a", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-85", "turn": 0}
-{"t": 82.20947267244422, "model": "q15", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-86", "turn": 0}
+{"t": 82.20947267244422, "model": "q05c", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-86", "turn": 0}
 {"t": 82.67194274593251, "model": "q05a", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-87", "turn": 0}
 {"t": 82.9245784700167, "model": "q05a", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-88", "turn": 0}
 {"t": 83.93281577527446, "model": "q06", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-89", "turn": 0}
@@ -95,9 +95,9 @@
 {"t": 85.0778655812347, "model": "q05a", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-93", "turn": 0}
 {"t": 85.68200394857277, "model": "q06", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-94", "turn": 0}
 {"t": 85.81322693634532, "model": "q05a", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-95", "turn": 0}
-{"t": 86.56211186066524, "model": "q15", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-96", "turn": 0}
+{"t": 86.56211186066524, "model": "q05c", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-96", "turn": 0}
 {"t": 87.22909064170327, "model": "q06", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-97", "turn": 0}
-{"t": 87.88452011688895, "model": "q15", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-98", "turn": 0}
+{"t": 87.88452011688895, "model": "q05c", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-98", "turn": 0}
 {"t": 88.03985101167639, "model": "q05b", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-99", "turn": 0}
 {"t": 89.00602109527695, "model": "q06", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-100", "turn": 0}
 {"t": 89.59389621942064, "model": "q05a", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-101", "turn": 0}
@@ -107,7 +107,7 @@
 {"t": 96.2793614419976, "model": "q05b", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-105", "turn": 0}
 {"t": 97.0352386986819, "model": "q05a", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-106", "turn": 0}
 {"t": 97.6804681510153, "model": "q05a", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-107", "turn": 0}
-{"t": 98.32903307700848, "model": "q15", "team": "team-a", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-108", "turn": 0}
+{"t": 98.32903307700848, "model": "q05c", "team": "team-a", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-108", "turn": 0}
 {"t": 99.86587018069407, "model": "q06", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-109", "turn": 0}
 {"t": 100.83758135341563, "model": "q05a", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-110", "turn": 0}
 {"t": 102.95220760584603, "model": "q05a", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-111", "turn": 0}
@@ -115,7 +115,7 @@
 {"t": 105.56788285685657, "model": "q05a", "team": "team-c", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-113", "turn": 0}
 {"t": 106.39115501351637, "model": "q06", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-114", "turn": 0}
 {"t": 108.87688664343372, "model": "q05a", "team": "team-b", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-115", "turn": 0}
-{"t": 108.89229869592414, "model": "q15", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-116", "turn": 0}
+{"t": 108.89229869592414, "model": "q05c", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-116", "turn": 0}
 {"t": 111.97756572705337, "model": "q05a", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-117", "turn": 0}
 {"t": 112.9864229417371, "model": "q05a", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-118", "turn": 0}
 {"t": 113.7931123309666, "model": "q06", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-119", "turn": 0}
@@ -123,14 +123,14 @@
 {"t": 116.13589383275132, "model": "q05a", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-121", "turn": 0}
 {"t": 117.14396431173066, "model": "q06", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-122", "turn": 0}
 {"t": 117.65935544362503, "model": "q06", "team": "team-a", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-123", "turn": 0}
-{"t": 121.81488687875294, "model": "q15", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-124", "turn": 0}
+{"t": 121.81488687875294, "model": "q05c", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-124", "turn": 0}
 {"t": 127.19275589297034, "model": "q05a", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-125", "turn": 0}
 {"t": 127.61631044880745, "model": "q05a", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-126", "turn": 0}
 {"t": 127.87027900514208, "model": "q06", "team": "team-b", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-127", "turn": 0}
 {"t": 128.59661935381655, "model": "q05b", "team": "team-c", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-128", "turn": 0}
 {"t": 129.07341096731437, "model": "q05a", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-129", "turn": 0}
-{"t": 129.21255287653298, "model": "q15", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-130", "turn": 0}
-{"t": 130.1037398211304, "model": "q15", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-131", "turn": 0}
+{"t": 129.21255287653298, "model": "q05c", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-130", "turn": 0}
+{"t": 130.1037398211304, "model": "q05c", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-131", "turn": 0}
 {"t": 131.1067848701809, "model": "q05b", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-132", "turn": 0}
 {"t": 132.5069783700452, "model": "q05a", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-133", "turn": 0}
 {"t": 132.54336312008846, "model": "q06", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-134", "turn": 0}
@@ -140,10 +140,10 @@
 {"t": 139.33906845591665, "model": "q05b", "team": "team-a", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-138", "turn": 0}
 {"t": 140.0310261382293, "model": "q06", "team": "team-b", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-139", "turn": 0}
 {"t": 143.00625451549666, "model": "q06", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-140", "turn": 0}
-{"t": 145.52649865072866, "model": "q15", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-141", "turn": 0}
+{"t": 145.52649865072866, "model": "q05c", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-141", "turn": 0}
 {"t": 147.1744678585944, "model": "q05a", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-142", "turn": 0}
 {"t": 149.08450464412695, "model": "q05a", "team": "team-c", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-143", "turn": 0}
-{"t": 150.92473715249307, "model": "q15", "team": "team-a", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-144", "turn": 0}
+{"t": 150.92473715249307, "model": "q05c", "team": "team-a", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-144", "turn": 0}
 {"t": 151.68364223240067, "model": "q05a", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-145", "turn": 0}
 {"t": 153.1252058848481, "model": "q06", "team": "team-c", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-146", "turn": 0}
 {"t": 153.6730600606143, "model": "q05a", "team": "team-a", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-147", "turn": 0}
@@ -156,10 +156,10 @@
 {"t": 159.2212182941858, "model": "q05a", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-154", "turn": 0}
 {"t": 159.46543635486526, "model": "q05a", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-155", "turn": 0}
 {"t": 159.5859237093694, "model": "q05a", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-156", "turn": 0}
-{"t": 161.6518418630963, "model": "q15", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-157", "turn": 0}
+{"t": 161.6518418630963, "model": "q05c", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-157", "turn": 0}
 {"t": 161.7854504246858, "model": "q05b", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-158", "turn": 0}
 {"t": 162.50740561574133, "model": "q05a", "team": "team-a", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-159", "turn": 0}
-{"t": 163.19327527551485, "model": "q15", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-160", "turn": 0}
+{"t": 163.19327527551485, "model": "q05c", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-160", "turn": 0}
 {"t": 165.29776283522466, "model": "q05a", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-161", "turn": 0}
 {"t": 165.44529166837543, "model": "q05a", "team": "team-a", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-162", "turn": 0}
 {"t": 166.20438422216856, "model": "q05a", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-163", "turn": 0}
@@ -181,7 +181,7 @@
 {"t": 179.63798879838478, "model": "q05a", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-179", "turn": 0}
 {"t": 179.64256687816493, "model": "q06", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-180", "turn": 0}
 {"t": 179.69335140171972, "model": "q06", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-181", "turn": 0}
-{"t": 180.2447066141578, "model": "q15", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-182", "turn": 0}
+{"t": 180.2447066141578, "model": "q05c", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-182", "turn": 0}
 {"t": 180.79159764326675, "model": "q05a", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-183", "turn": 0}
 {"t": 184.10603709537895, "model": "q05a", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-184", "turn": 0}
 {"t": 184.15316052413888, "model": "q05a", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-185", "turn": 0}
@@ -189,10 +189,10 @@
 {"t": 185.77331259643293, "model": "q06", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-187", "turn": 0}
 {"t": 186.0668127562706, "model": "q05a", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-188", "turn": 0}
 {"t": 187.0527327227406, "model": "q05a", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-189", "turn": 0}
-{"t": 189.39642323426656, "model": "q15", "team": "team-b", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-190", "turn": 0}
+{"t": 189.39642323426656, "model": "q05c", "team": "team-b", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-190", "turn": 0}
 {"t": 191.43062496419492, "model": "q05a", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-191", "turn": 0}
 {"t": 191.82317235130196, "model": "q05a", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-192", "turn": 0}
-{"t": 192.21726680096742, "model": "q15", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-193", "turn": 0}
+{"t": 192.21726680096742, "model": "q05c", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-193", "turn": 0}
 {"t": 194.28666350748276, "model": "q05a", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-194", "turn": 0}
 {"t": 196.49497029048348, "model": "q05a", "team": "team-a", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-195", "turn": 0}
 {"t": 196.91288326051023, "model": "q06", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-196", "turn": 0}
@@ -210,10 +210,10 @@
 {"t": 206.33838991878605, "model": "q05a", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-208", "turn": 0}
 {"t": 207.91834690029063, "model": "q05a", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-209", "turn": 0}
 {"t": 208.97958563301665, "model": "q05b", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-210", "turn": 0}
-{"t": 210.67497121594786, "model": "q15", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-211", "turn": 0}
+{"t": 210.67497121594786, "model": "q05c", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-211", "turn": 0}
 {"t": 211.07279554187883, "model": "q06", "team": "team-c", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-212", "turn": 0}
 {"t": 211.15717406193153, "model": "q05a", "team": "team-a", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-213", "turn": 0}
-{"t": 211.44237899240008, "model": "q15", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-214", "turn": 0}
+{"t": 211.44237899240008, "model": "q05c", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-214", "turn": 0}
 {"t": 211.72548818938884, "model": "q05b", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-215", "turn": 0}
 {"t": 213.07773201393715, "model": "q06", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-216", "turn": 0}
 {"t": 214.01811560405912, "model": "q05a", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-217", "turn": 0}
@@ -222,7 +222,7 @@
 {"t": 216.0126093821068, "model": "q05b", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-220", "turn": 0}
 {"t": 216.5870831359821, "model": "q05a", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-221", "turn": 0}
 {"t": 216.92658884035828, "model": "q05a", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-222", "turn": 0}
-{"t": 216.98720193816254, "model": "q15", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-223", "turn": 0}
+{"t": 216.98720193816254, "model": "q05c", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-223", "turn": 0}
 {"t": 217.68868252784344, "model": "q05a", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-224", "turn": 0}
 {"t": 218.04741429877083, "model": "q05b", "team": "team-a", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-225", "turn": 0}
 {"t": 220.31424853743368, "model": "q05a", "team": "team-b", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-226", "turn": 0}
@@ -245,7 +245,7 @@
 {"t": 239.70714592126114, "model": "q05a", "team": "team-a", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-243", "turn": 0}
 {"t": 242.786575489608, "model": "q05a", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-244", "turn": 0}
 {"t": 243.85300790089426, "model": "q05a", "team": "team-c", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-245", "turn": 0}
-{"t": 244.60640788400224, "model": "q15", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-246", "turn": 0}
+{"t": 244.60640788400224, "model": "q05c", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-246", "turn": 0}
 {"t": 244.6621583849435, "model": "q05a", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-247", "turn": 0}
 {"t": 244.6998995052863, "model": "q05a", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-248", "turn": 0}
 {"t": 245.9565629344504, "model": "q06", "team": "team-a", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-249", "turn": 0}
@@ -256,7 +256,7 @@
 {"t": 252.58171826585314, "model": "q05a", "team": "team-c", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-254", "turn": 0}
 {"t": 252.61154671841027, "model": "q05b", "team": "team-a", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-255", "turn": 0}
 {"t": 254.81725780721968, "model": "q05b", "team": "team-b", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-256", "turn": 0}
-{"t": 255.05260264506455, "model": "q15", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-257", "turn": 0}
+{"t": 255.05260264506455, "model": "q05c", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-257", "turn": 0}
 {"t": 255.32105769749455, "model": "q05a", "team": "team-a", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-258", "turn": 0}
 {"t": 255.87599250064142, "model": "q05a", "team": "team-b", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-259", "turn": 0}
 {"t": 256.1671754082258, "model": "q05b", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-260", "turn": 0}
@@ -273,7 +273,7 @@
 {"t": 269.52143184829515, "model": "q06", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-271", "turn": 0}
 {"t": 270.5204796441698, "model": "q05a", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-272", "turn": 0}
 {"t": 270.91886172473596, "model": "q05a", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-273", "turn": 0}
-{"t": 271.43232522494947, "model": "q15", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-274", "turn": 0}
+{"t": 271.43232522494947, "model": "q05c", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-274", "turn": 0}
 {"t": 272.6199774281952, "model": "q05b", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-275", "turn": 0}
 {"t": 275.6948396252711, "model": "q05a", "team": "team-a", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-276", "turn": 0}
 {"t": 275.90763020748346, "model": "q05a", "team": "team-b", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-277", "turn": 0}
@@ -289,7 +289,7 @@
 {"t": 285.2953593151607, "model": "q05a", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-287", "turn": 0}
 {"t": 285.5567695350298, "model": "q06", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-288", "turn": 0}
 {"t": 285.93384139012807, "model": "q05a", "team": "team-b", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-289", "turn": 0}
-{"t": 291.2988848163579, "model": "q15", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-290", "turn": 0}
+{"t": 291.2988848163579, "model": "q05c", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-290", "turn": 0}
 {"t": 292.698953774796, "model": "q05a", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-291", "turn": 0}
 {"t": 293.3093321974618, "model": "q06", "team": "team-b", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-292", "turn": 0}
 {"t": 293.8573718272904, "model": "q05a", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-293", "turn": 0}
@@ -308,7 +308,7 @@
 {"t": 305.98142661934025, "model": "q06", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-306", "turn": 0}
 {"t": 306.9880704563925, "model": "q06", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-307", "turn": 0}
 {"t": 307.1371559141169, "model": "q06", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-308", "turn": 0}
-{"t": 307.9028837439207, "model": "q15", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-309", "turn": 0}
+{"t": 307.9028837439207, "model": "q05c", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-309", "turn": 0}
 {"t": 308.1764642566359, "model": "q05a", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-310", "turn": 0}
 {"t": 308.89103719591236, "model": "q05b", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-311", "turn": 0}
 {"t": 313.755587610654, "model": "q05a", "team": "team-a", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-312", "turn": 0}
@@ -319,7 +319,7 @@
 {"t": 318.9955695168535, "model": "q05a", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-317", "turn": 0}
 {"t": 319.57640712549465, "model": "q06", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-318", "turn": 0}
 {"t": 319.7183573003827, "model": "q05a", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-319", "turn": 0}
-{"t": 319.8080420086232, "model": "q15", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-320", "turn": 0}
+{"t": 319.8080420086232, "model": "q05c", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-320", "turn": 0}
 {"t": 321.28618487937496, "model": "q05b", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-321", "turn": 0}
 {"t": 322.1887890714783, "model": "q05b", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-322", "turn": 0}
 {"t": 322.3095136461936, "model": "q06", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-323", "turn": 0}
@@ -331,7 +331,7 @@
 {"t": 325.9375640112528, "model": "q05a", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-329", "turn": 0}
 {"t": 328.61077972026624, "model": "q06", "team": "team-a", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-330", "turn": 0}
 {"t": 328.7518822903683, "model": "q05a", "team": "team-b", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-331", "turn": 0}
-{"t": 330.2944918489483, "model": "q15", "team": "team-c", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-332", "turn": 0}
+{"t": 330.2944918489483, "model": "q05c", "team": "team-c", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-332", "turn": 0}
 {"t": 330.3420279136527, "model": "q05a", "team": "team-a", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-333", "turn": 0}
 {"t": 331.2203687307154, "model": "q05a", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-334", "turn": 0}
 {"t": 331.96027299997945, "model": "q05a", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-335", "turn": 0}
@@ -345,21 +345,21 @@
 {"t": 342.4034832854965, "model": "q05b", "team": "team-b", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-343", "turn": 0}
 {"t": 347.4281102016138, "model": "q05b", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-344", "turn": 0}
 {"t": 348.34937734102095, "model": "q06", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-345", "turn": 0}
-{"t": 351.5893678930011, "model": "q15", "team": "team-b", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-346", "turn": 0}
+{"t": 351.5893678930011, "model": "q05c", "team": "team-b", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-346", "turn": 0}
 {"t": 351.82008410505375, "model": "q06", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-347", "turn": 0}
 {"t": 353.57690793681263, "model": "q05a", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-348", "turn": 0}
 {"t": 354.97697146963566, "model": "q05b", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-349", "turn": 0}
 {"t": 355.5728909005991, "model": "q05a", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-350", "turn": 0}
 {"t": 356.5041003901424, "model": "q05a", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-351", "turn": 0}
 {"t": 356.6438980415496, "model": "q06", "team": "team-b", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-352", "turn": 0}
-{"t": 356.7504660473749, "model": "q15", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-353", "turn": 0}
+{"t": 356.7504660473749, "model": "q05c", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-353", "turn": 0}
 {"t": 358.1523586809935, "model": "q05b", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-354", "turn": 0}
 {"t": 358.9056798986381, "model": "q06", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-355", "turn": 0}
 {"t": 359.3107726298714, "model": "q05a", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-356", "turn": 0}
 {"t": 359.52937967987765, "model": "q06", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-357", "turn": 0}
 {"t": 361.6056172792501, "model": "q05a", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-358", "turn": 0}
 {"t": 361.69465780016463, "model": "q06", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-359", "turn": 0}
-{"t": 361.93201423906527, "model": "q15", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-360", "turn": 0}
+{"t": 361.93201423906527, "model": "q05c", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-360", "turn": 0}
 {"t": 362.1658399124431, "model": "q05b", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-361", "turn": 0}
 {"t": 363.12690119554287, "model": "q05a", "team": "team-c", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-362", "turn": 0}
 {"t": 364.6143046033408, "model": "q06", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-363", "turn": 0}
@@ -370,9 +370,9 @@
 {"t": 371.1763739687572, "model": "q06", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-368", "turn": 0}
 {"t": 373.16936204143974, "model": "q06", "team": "team-a", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-369", "turn": 0}
 {"t": 373.6341759789858, "model": "q06", "team": "team-b", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-370", "turn": 0}
-{"t": 374.640607601441, "model": "q15", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-371", "turn": 0}
+{"t": 374.640607601441, "model": "q05c", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-371", "turn": 0}
 {"t": 374.8065419311855, "model": "q05a", "team": "team-a", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-372", "turn": 0}
-{"t": 374.8159652295408, "model": "q15", "team": "team-b", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-373", "turn": 0}
+{"t": 374.8159652295408, "model": "q05c", "team": "team-b", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-373", "turn": 0}
 {"t": 375.6357709513717, "model": "q06", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-374", "turn": 0}
 {"t": 375.6434020099464, "model": "q05a", "team": "team-a", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-375", "turn": 0}
 {"t": 376.7574824251855, "model": "q05a", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-376", "turn": 0}
@@ -415,12 +415,12 @@
 {"t": 406.3261431115465, "model": "q05a", "team": "team-c", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-413", "turn": 0}
 {"t": 407.65043675254054, "model": "q06", "team": "team-a", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-414", "turn": 0}
 {"t": 410.34382968896057, "model": "q06", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-415", "turn": 0}
-{"t": 410.80131408745876, "model": "q15", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-416", "turn": 0}
+{"t": 410.80131408745876, "model": "q05c", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-416", "turn": 0}
 {"t": 412.7233051608781, "model": "q05a", "team": "team-a", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-417", "turn": 0}
 {"t": 413.2198317611548, "model": "q05a", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-418", "turn": 0}
 {"t": 414.62810517928904, "model": "q05b", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-419", "turn": 0}
 {"t": 415.66823491128633, "model": "q05a", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-420", "turn": 0}
-{"t": 418.19988074882804, "model": "q15", "team": "team-b", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-421", "turn": 0}
+{"t": 418.19988074882804, "model": "q05c", "team": "team-b", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-421", "turn": 0}
 {"t": 418.3796064453845, "model": "q05a", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-422", "turn": 0}
 {"t": 419.0212406553047, "model": "q05b", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-423", "turn": 0}
 {"t": 419.57221396351787, "model": "q05a", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-424", "turn": 0}
@@ -447,25 +447,25 @@
 {"t": 445.2185102806921, "model": "q06", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-445", "turn": 0}
 {"t": 446.797073747601, "model": "q05a", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-446", "turn": 0}
 {"t": 449.05898213759406, "model": "q05a", "team": "team-a", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-447", "turn": 0}
-{"t": 450.0677270575698, "model": "q15", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-448", "turn": 0}
+{"t": 450.0677270575698, "model": "q05c", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-448", "turn": 0}
 {"t": 452.89824649608175, "model": "q05a", "team": "team-c", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-449", "turn": 0}
-{"t": 453.6259264632515, "model": "q15", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-450", "turn": 0}
+{"t": 453.6259264632515, "model": "q05c", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-450", "turn": 0}
 {"t": 453.9418198192569, "model": "q05a", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-451", "turn": 0}
 {"t": 454.52723338448004, "model": "q06", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-452", "turn": 0}
 {"t": 454.832333884227, "model": "q05a", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-453", "turn": 0}
 {"t": 455.703789403129, "model": "q05a", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-454", "turn": 0}
 {"t": 455.8508876555214, "model": "q05a", "team": "team-c", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-455", "turn": 0}
-{"t": 456.4764823117365, "model": "q15", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-456", "turn": 0}
+{"t": 456.4764823117365, "model": "q05c", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-456", "turn": 0}
 {"t": 456.981614561024, "model": "q05a", "team": "team-b", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-457", "turn": 0}
 {"t": 459.5953805978034, "model": "q06", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-458", "turn": 0}
 {"t": 461.3715555552261, "model": "q06", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-459", "turn": 0}
 {"t": 463.12941213245097, "model": "q05a", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-460", "turn": 0}
-{"t": 463.50613143295453, "model": "q15", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-461", "turn": 0}
+{"t": 463.50613143295453, "model": "q05c", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-461", "turn": 0}
 {"t": 466.23325403058567, "model": "q06", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-462", "turn": 0}
-{"t": 468.0033143871423, "model": "q15", "team": "team-b", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-463", "turn": 0}
-{"t": 470.7807660681287, "model": "q15", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-464", "turn": 0}
+{"t": 468.0033143871423, "model": "q05c", "team": "team-b", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-463", "turn": 0}
+{"t": 470.7807660681287, "model": "q05c", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-464", "turn": 0}
 {"t": 471.3724492677002, "model": "q05a", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-465", "turn": 0}
-{"t": 472.52432436772824, "model": "q15", "team": "team-b", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-466", "turn": 0}
+{"t": 472.52432436772824, "model": "q05c", "team": "team-b", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-466", "turn": 0}
 {"t": 474.02978352388993, "model": "q05a", "team": "team-c", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-467", "turn": 0}
 {"t": 474.75207166304483, "model": "q06", "team": "team-a", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-468", "turn": 0}
 {"t": 477.56898536681683, "model": "q05a", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-469", "turn": 0}
@@ -475,23 +475,23 @@
 {"t": 479.6691710870961, "model": "q05a", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-473", "turn": 0}
 {"t": 479.7343892767925, "model": "q05a", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-474", "turn": 0}
 {"t": 480.7426995975223, "model": "q06", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-475", "turn": 0}
-{"t": 481.22334989572386, "model": "q15", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-476", "turn": 0}
+{"t": 481.22334989572386, "model": "q05c", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-476", "turn": 0}
 {"t": 481.5365654741075, "model": "q05a", "team": "team-a", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-477", "turn": 0}
 {"t": 482.18584867030125, "model": "q05b", "team": "team-b", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-478", "turn": 0}
-{"t": 482.8176096751299, "model": "q15", "team": "team-c", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-479", "turn": 0}
+{"t": 482.8176096751299, "model": "q05c", "team": "team-c", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-479", "turn": 0}
 {"t": 484.36440988933094, "model": "q05a", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-480", "turn": 0}
 {"t": 486.0203546955283, "model": "q06", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-481", "turn": 0}
-{"t": 486.57333469195254, "model": "q15", "team": "team-c", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-482", "turn": 0}
+{"t": 486.57333469195254, "model": "q05c", "team": "team-c", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-482", "turn": 0}
 {"t": 487.36458994471, "model": "q05a", "team": "team-a", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-483", "turn": 0}
 {"t": 487.5472561816595, "model": "q06", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-484", "turn": 0}
 {"t": 488.4913938704035, "model": "q05b", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-485", "turn": 0}
 {"t": 488.84444235832376, "model": "q05a", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-486", "turn": 0}
 {"t": 489.6070428195028, "model": "q06", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-487", "turn": 0}
-{"t": 491.4889351716384, "model": "q15", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-488", "turn": 0}
+{"t": 491.4889351716384, "model": "q05c", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-488", "turn": 0}
 {"t": 491.7895876811909, "model": "q05a", "team": "team-a", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-489", "turn": 0}
 {"t": 494.48683071645684, "model": "q05a", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-490", "turn": 0}
-{"t": 494.5164013325856, "model": "q15", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-491", "turn": 0}
-{"t": 494.84786855207966, "model": "q15", "team": "team-a", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-492", "turn": 0}
+{"t": 494.5164013325856, "model": "q05c", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-491", "turn": 0}
+{"t": 494.84786855207966, "model": "q05c", "team": "team-a", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-492", "turn": 0}
 {"t": 497.36168041938885, "model": "q05a", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-493", "turn": 0}
 {"t": 497.59094240059306, "model": "q06", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-494", "turn": 0}
 {"t": 498.7589949350289, "model": "q05a", "team": "team-a", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-495", "turn": 0}
@@ -503,17 +503,17 @@
 {"t": 507.0231434551415, "model": "q05a", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-501", "turn": 0}
 {"t": 507.23967504965833, "model": "q05a", "team": "team-b", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-502", "turn": 0}
 {"t": 507.4467734008308, "model": "q05b", "team": "team-c", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-503", "turn": 0}
-{"t": 509.79738915721185, "model": "q15", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-504", "turn": 0}
+{"t": 509.79738915721185, "model": "q05c", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-504", "turn": 0}
 {"t": 510.87424168903243, "model": "q06", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-505", "turn": 0}
 {"t": 511.35812496388434, "model": "q06", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-506", "turn": 0}
 {"t": 514.750500357599, "model": "q05a", "team": "team-a", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-507", "turn": 0}
 {"t": 515.0555093517152, "model": "q05a", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-508", "turn": 0}
-{"t": 515.8934981852351, "model": "q15", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-509", "turn": 0}
+{"t": 515.8934981852351, "model": "q05c", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-509", "turn": 0}
 {"t": 516.2820242680313, "model": "q05b", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-510", "turn": 0}
 {"t": 517.1931826111875, "model": "q05a", "team": "team-b", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-511", "turn": 0}
 {"t": 518.8150282120644, "model": "q05a", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-512", "turn": 0}
 {"t": 519.2584945935711, "model": "q06", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-513", "turn": 0}
-{"t": 520.0707802952096, "model": "q15", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-514", "turn": 0}
+{"t": 520.0707802952096, "model": "q05c", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-514", "turn": 0}
 {"t": 520.8092392711657, "model": "q05a", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-515", "turn": 0}
 {"t": 524.418317424683, "model": "q05a", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-516", "turn": 0}
 {"t": 524.8029302659788, "model": "q06", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-517", "turn": 0}
@@ -533,10 +533,10 @@
 {"t": 539.1519851134797, "model": "q05a", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-531", "turn": 0}
 {"t": 541.8605577849543, "model": "q05a", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-532", "turn": 0}
 {"t": 542.3732433445396, "model": "q05a", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-533", "turn": 0}
-{"t": 542.4641644338889, "model": "q15", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-534", "turn": 0}
+{"t": 542.4641644338889, "model": "q05c", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-534", "turn": 0}
 {"t": 542.7093901791477, "model": "q05a", "team": "team-b", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-535", "turn": 0}
 {"t": 544.1311119850266, "model": "q05b", "team": "team-c", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-536", "turn": 0}
-{"t": 546.8948894051636, "model": "q15", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-537", "turn": 0}
+{"t": 546.8948894051636, "model": "q05c", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-537", "turn": 0}
 {"t": 548.3631597166548, "model": "q06", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-538", "turn": 0}
 {"t": 549.881890820798, "model": "q05b", "team": "team-c", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-539", "turn": 0}
 {"t": 550.1834887616673, "model": "q06", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-540", "turn": 0}
@@ -544,16 +544,16 @@
 {"t": 551.3661745507843, "model": "q06", "team": "team-c", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-542", "turn": 0}
 {"t": 551.9317723943276, "model": "q05b", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-543", "turn": 0}
 {"t": 552.0366733584913, "model": "q06", "team": "team-b", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-544", "turn": 0}
-{"t": 553.3083389559157, "model": "q15", "team": "team-c", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-545", "turn": 0}
+{"t": 553.3083389559157, "model": "q05c", "team": "team-c", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-545", "turn": 0}
 {"t": 554.8311225232762, "model": "q05a", "team": "team-a", "prompt": "Give me three alternatives and the strongest objection to each.", "max_tokens": 64, "session": "zipf-546", "turn": 0}
 {"t": 557.0212374343556, "model": "q05a", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-547", "turn": 0}
 {"t": 557.683007356993, "model": "q05b", "team": "team-c", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-548", "turn": 0}
-{"t": 559.2317371074654, "model": "q15", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-549", "turn": 0}
+{"t": 559.2317371074654, "model": "q05c", "team": "team-a", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-549", "turn": 0}
 {"t": 559.6469283617567, "model": "q06", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-550", "turn": 0}
 {"t": 559.8028104335884, "model": "q06", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-551", "turn": 0}
 {"t": 559.870202396018, "model": "q05a", "team": "team-a", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-552", "turn": 0}
-{"t": 561.0358613006802, "model": "q15", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-553", "turn": 0}
-{"t": 563.0273347912865, "model": "q15", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-554", "turn": 0}
+{"t": 561.0358613006802, "model": "q05c", "team": "team-b", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-553", "turn": 0}
+{"t": 563.0273347912865, "model": "q05c", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-554", "turn": 0}
 {"t": 564.9537719444417, "model": "q05a", "team": "team-a", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-555", "turn": 0}
 {"t": 566.5067676066122, "model": "q05b", "team": "team-b", "prompt": "Why is the p99 so much worse than the p50 here?", "max_tokens": 64, "session": "zipf-556", "turn": 0}
 {"t": 566.6495083136842, "model": "q05a", "team": "team-c", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-557", "turn": 0}
@@ -572,13 +572,13 @@
 {"t": 580.8585178341693, "model": "q06", "team": "team-a", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-570", "turn": 0}
 {"t": 581.5236098799646, "model": "q06", "team": "team-b", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-571", "turn": 0}
 {"t": 581.5567417600801, "model": "q05a", "team": "team-c", "prompt": "What breaks first if traffic increases tenfold?", "max_tokens": 64, "session": "zipf-572", "turn": 0}
-{"t": 582.1058828642496, "model": "q15", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-573", "turn": 0}
+{"t": 582.1058828642496, "model": "q05c", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-573", "turn": 0}
 {"t": 582.9601389905041, "model": "q05a", "team": "team-b", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-574", "turn": 0}
 {"t": 586.3489346748537, "model": "q05b", "team": "team-c", "prompt": "Which of these would you cut to ship a week sooner?", "max_tokens": 64, "session": "zipf-575", "turn": 0}
 {"t": 588.9806552636373, "model": "q05a", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-576", "turn": 0}
 {"t": 591.0796861224051, "model": "q05a", "team": "team-b", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-577", "turn": 0}
 {"t": 592.7914828795155, "model": "q05a", "team": "team-c", "prompt": "Write the migration for that schema change.", "max_tokens": 64, "session": "zipf-578", "turn": 0}
-{"t": 593.1140807257195, "model": "q15", "team": "team-a", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-579", "turn": 0}
+{"t": 593.1140807257195, "model": "q05c", "team": "team-a", "prompt": "Walk me through what happens on a cache miss.", "max_tokens": 64, "session": "zipf-579", "turn": 0}
 {"t": 594.2840667284214, "model": "q05a", "team": "team-b", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-580", "turn": 0}
 {"t": 595.0763269077312, "model": "q05b", "team": "team-c", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-581", "turn": 0}
 {"t": 595.9972871486352, "model": "q05a", "team": "team-a", "prompt": "Summarise the tradeoffs in the design I just described.", "max_tokens": 64, "session": "zipf-582", "turn": 0}

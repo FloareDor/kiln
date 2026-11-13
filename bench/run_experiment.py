@@ -106,9 +106,13 @@ def summarise(rows: list[dict], label: str) -> dict:
     span = (max(float(r["t_wall"]) for r in rows) -
             min(float(r["t_wall"]) for r in rows)) if rows else 0.0
 
+    # A replay that could not keep up with its trace is not a measurement of the
+    # system; surface it rather than letting it read as latency.
+    offered = len(rows) / span if span > 0 else 0.0
     return {
         "arm": label,
         "requests": len(rows),
+        "offered_rps": round(offered, 2),
         "ok": len(ok),
         "errors": len(rows) - len(ok),
         "ttft_p50_ms": round(pct(ttfts, 0.50), 1),
@@ -171,12 +175,16 @@ def check_trace_matches_fleet(trace: pathlib.Path, deployed: list[str]) -> None:
 
 
 def run_locust(gateway: str, trace: pathlib.Path, out_csv: pathlib.Path,
-               users: int, api_key: str, duration: str) -> list[dict]:
+               users: int, api_key: str, duration: str, max_tokens: int = 0) -> list[dict]:
     """Replay a trace through the gateway and return the per-request rows."""
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
         sys.executable, "-m", "locust",
         "-f", str(REPO / "bench" / "locustfile.py"),
+        # Name the user class explicitly. Locust runs every HttpUser subclass in the
+        # file otherwise, so SteadyUser would generate its own traffic alongside the
+        # trace replay and silently dominate the measurement.
+        "TraceUser",
         "--host", gateway, "--headless",
         "-u", str(users), "-r", str(max(1, users // 2)),
         "-t", duration,
@@ -186,6 +194,8 @@ def run_locust(gateway: str, trace: pathlib.Path, out_csv: pathlib.Path,
     ]
     if api_key:
         cmd += ["--api-key", api_key]
+    if max_tokens:
+        cmd += ["--max-tokens", str(max_tokens)]
     subprocess.run(cmd, check=False, capture_output=True, text=True)
 
     if not out_csv.exists():
@@ -430,7 +440,7 @@ def experiment_3(b: Bench) -> None:
                 try:
                     raw = RESULTS / "raw" / f"exp3_{trace.stem}_{policy}.csv"
                     reqs = run_locust(url, trace, raw, b.args.users,
-                                      b.api_key, b.args.duration)
+                                      b.api_key, b.args.duration, b.args.max_tokens)
                     m = prom_scrape(f"{url}/metrics")
                     s = summarise(reqs, f"{trace.stem}/{policy}")
                     hits = counter_total(m, "kiln_residency_hits_total")
@@ -489,7 +499,8 @@ def experiment_5(b: Bench) -> None:
             svc, url = b.gateway(router=router)
             try:
                 raw = RESULTS / "raw" / f"exp5_{router}.csv"
-                reqs = run_locust(url, trace, raw, b.args.users, b.api_key, b.args.duration)
+                reqs = run_locust(url, trace, raw, b.args.users, b.api_key,
+                                  b.args.duration, b.args.max_tokens)
                 m = prom_scrape(f"{url}/metrics")
                 s = summarise(reqs, router)
                 s["router"] = router
@@ -534,7 +545,8 @@ def experiment_1(b: Bench) -> None:
             b.deploy(model_id, repo, replicas=replicas, gpu_util=util)
             svc, url = b.gateway(router="round-robin")
             raw = RESULTS / "raw" / f"exp1_r{replicas}.csv"
-            reqs = run_locust(url, trace, raw, b.args.users, b.api_key, b.args.duration)
+            reqs = run_locust(url, trace, raw, b.args.users, b.api_key,
+                              b.args.duration, b.args.max_tokens)
             s = summarise(reqs, f"{replicas} replicas")
             s["replicas"] = replicas
             rows.append(s)
@@ -557,7 +569,18 @@ def main() -> int:
     ap.add_argument("--experiment", type=int, required=True, choices=sorted(EXPERIMENTS))
     ap.add_argument("--database-url", default=os.environ.get("KILN_DATABASE_URL", ""))
     ap.add_argument("--duration", default="5m")
-    ap.add_argument("--users", type=int, default=8)
+    # Concurrency has to exceed what the trace needs, not match it. A user that
+    # blocks for a 35s cold start cannot issue the requests that fell due while it
+    # waited, so too few users makes the replay silently slower than the trace it is
+    # replaying -- three users produced three requests in two minutes against a
+    # 1 req/s trace. Enough users keep the offered load equal to the recorded rate.
+    # Concurrency has to exceed what the trace needs, but not saturate the GPU.
+    # Swap operations compete with inference for the same device: with the card
+    # saturated, a wake that takes 0.7s idle took 81 seconds, and the whole run
+    # became a measurement of contention rather than of eviction policy.
+    ap.add_argument("--users", type=int, default=4)
+    # Short outputs keep the GPU free enough that a swap can actually run.
+    ap.add_argument("--max-tokens", type=int, default=16)
     ap.add_argument("--replicas", type=int, default=2)
     ap.add_argument("--replica-sweep", default="1,2")
     ap.add_argument("--policies", default=",".join(
@@ -571,7 +594,13 @@ def main() -> int:
     # always "freshly resident", nothing is ever evictable, and the scheduler simply
     # stops making progress. That is a calibration error, not a policy result.
     ap.add_argument("--min-residency", default="5s")
-    ap.add_argument("--drain-deadline", default="10s")
+    # 2s, not 10s. The deadline bounds how long an eviction waits for in-flight
+    # requests, so it should be a small multiple of how long a request takes (~1s
+    # here). At 10s, with enough concurrency that a model always has something in
+    # flight, every eviction burned the full deadline -- and because swaps are
+    # serialised, the whole system became drain-bound: 27 requests in three minutes
+    # against a 1 req/s trace, every one of them waiting about 105s.
+    ap.add_argument("--drain-deadline", default="2s")
     ap.add_argument("--gpu-bytes", type=int, default=8 * 1024**3)
     ap.add_argument("--gpu-reserve-bytes", type=int, default=1024**3)
     ap.add_argument("--measure-wakes", action="store_true", default=True)

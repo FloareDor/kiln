@@ -6,6 +6,10 @@ Two user classes, because the experiments ask two different questions:
               times. Every policy and router arm sees the identical request sequence,
               which is what makes the comparisons mean anything.
 
+              Select it by name on the command line. Locust runs *every* HttpUser
+              subclass in a file unless told which to use, so omitting the name lets
+              SteadyUser generate traffic alongside the replay.
+
   SteadyUser  generates open-loop traffic for throughput and saturation runs where a
               fixed trace would just cap the offered load.
 
@@ -41,7 +45,8 @@ def _(parser):
     parser.add_argument("--api-key", default=os.environ.get("KILN_API_KEY", ""),
                         help="Bearer token for the gateway")
     parser.add_argument("--models", default="", help="comma-separated models for SteadyUser")
-    parser.add_argument("--max-tokens", type=int, default=64)
+    parser.add_argument("--max-tokens", type=int, default=0,
+                        help="override the trace's max_tokens; 0 keeps it")
     parser.add_argument("--stream", default="true", help="use SSE streaming")
     parser.add_argument("--results", default="", help="write a per-request CSV here")
 
@@ -215,8 +220,12 @@ class TraceUser(HttpUser):
         if delay > 0:
             time.sleep(delay)
 
+        # The CLI wins over the trace: output length is a load knob, and tying it to
+        # the trace would mean regenerating every trace to change the load, which
+        # would break comparability with runs already taken.
+        max_tokens = opts.max_tokens or req.get("max_tokens", 64)
         res = chat(self.client, opts.api_key, req["model"], req["prompt"],
-                   req.get("max_tokens", opts.max_tokens),
+                   max_tokens,
                    opts.stream.lower() == "true", req.get("team", ""),
                    req.get("session", ""), req.get("turn", 0))
         record({**res, "t_wall": time.perf_counter() - _start_wall,
@@ -231,7 +240,14 @@ class SteadyUser(HttpUser):
 
     def on_start(self):
         opts = self.environment.parsed_options
-        self.models = [m for m in opts.models.split(",") if m] or ["qwen-0.5b"]
+        self.models = [m for m in opts.models.split(",") if m]
+        if not self.models:
+            # No silent default. A hard-coded model id here once ran alongside the
+            # trace replay and sent nine requests for a non-existent model for every
+            # real one, which dominated every figure the experiment produced.
+            raise RuntimeError(
+                "SteadyUser needs --models; it is for open-loop runs, and the "
+                "trace-replay experiments should select TraceUser explicitly")
         self.rng = random.Random(id(self))
 
     @task

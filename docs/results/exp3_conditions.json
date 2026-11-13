@@ -1,11 +1,11 @@
 {
   "experiment": 3,
-  "when": "2026-11-13 09:07:47",
+  "when": "2026-11-13 10:21:09",
   "duration": "3m",
-  "users": 3,
-  "policies": "cold,lru,lfu-decay,cost-aware,predictive-prewarm",
+  "users": 4,
+  "policies": "lru",
   "routers": "round-robin,least-loaded,prefix-aware,prefix-aware+load",
-  "traces": "zipf_s10,bursty",
+  "traces": "zipf_s10",
   "models": [
     [
       "q05a",
@@ -15,7 +15,7 @@
     [
       "q06",
       "Qwen/Qwen3-0.6B",
-      0.24
+      0.32
     ],
     [
       "q05b",
@@ -23,13 +23,13 @@
       0.22
     ],
     [
-      "q15",
-      "Qwen/Qwen2.5-1.5B-Instruct",
-      0.5
+      "q05c",
+      "Qwen/Qwen2.5-0.5B-Instruct",
+      0.26
     ]
   ],
   "gpu_bytes": 8589934592,
   "gpu_reserve_bytes": 1073741824,
   "min_residency": "5s",
-  "drain_deadline": "10s"
+  "drain_deadline": "2s"
 }

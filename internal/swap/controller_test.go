@@ -618,6 +618,64 @@ func TestPinnedModelsAreNeverEvicted(t *testing.T) {
 
 // ---------------------------------------------------------------- accounting
 
+func TestEnsureWaitsForAWakeAlreadyInProgress(t *testing.T) {
+	// A model mid-transition produces a no-op plan, because the planner must not
+	// issue a second wake for something already waking -- that is what makes
+	// coalescing work. But a no-op plan is not a servable model. Reporting success
+	// here told the gateway to route to a replica that was still loading, which then
+	// found no ready replica and answered 503. Nearly every request in a benchmark
+	// run failed this way.
+	h := newHarness(t, 8, 150*time.Millisecond, scheduler.NewLRU(), model("a", 3))
+	setState(h.ctrl, "a", scheduler.StateWaking)
+
+	// Simulate the in-flight wake completing shortly.
+	go func() {
+		time.Sleep(200 * time.Millisecond)
+		h.ctrl.setStateResident("a")
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := h.ctrl.Ensure(ctx, "a"); err != nil {
+		t.Fatalf("Ensure should wait for the in-flight wake: %v", err)
+	}
+	if got := h.ctrl.States()["a"]; got != "ACTIVE" {
+		t.Fatalf("returned with the model in %s, not ACTIVE", got)
+	}
+	// And it must not have issued its own wake on top of the one in progress.
+	if n := h.agent.count("wake:"); n != 0 {
+		t.Fatalf("issued %d duplicate wakes for a transition already in progress", n)
+	}
+}
+
+func TestAStuckTransitionIsReleasedRatherThanWedgingTheModel(t *testing.T) {
+	// A model left in WAKING is the worst state to be stuck in: it counts against
+	// the VRAM budget, is never evictable, and is never servable, so it holds memory
+	// hostage and fails every request for itself permanently. A lost wake or a
+	// restarted agent is enough to cause it.
+	h := newHarness(t, 8, 0, scheduler.NewLRU(), model("stuck", 3))
+
+	h.ctrl.mu.Lock()
+	h.ctrl.state["stuck"] = &scheduler.Model{
+		ID:           "stuck",
+		State:        scheduler.StateWaking,
+		TransitionAt: time.Now().Add(-10 * time.Minute), // long past any sane deadline
+	}
+	h.ctrl.mu.Unlock()
+
+	cs, err := h.ctrl.Snapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cs.Models["stuck"].State; got == scheduler.StateWaking {
+		t.Fatal("a transition stuck for ten minutes was left in WAKING forever")
+	}
+	// Released means its memory is back in the budget.
+	if cs.VRAMUsed() != 0 {
+		t.Fatalf("stuck model still counts %d bytes against the budget", cs.VRAMUsed())
+	}
+}
+
 func TestBudgetAccountsForMemoryTheSchedulerDoesNotOwn(t *testing.T) {
 	// A workstation GPU is never empty: the desktop compositor holds about a
 	// gigabyte here, and every sleeping model keeps its CUDA context. Budgeting on

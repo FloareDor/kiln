@@ -102,6 +102,10 @@ type Controller struct {
 	inflightSwaps map[scheduler.ModelID]*swapCall
 }
 
+// errTransitionInProgress means the model is mid-wake or mid-start, so the right
+// response is to wait rather than to act or to fail.
+var errTransitionInProgress = errors.New("swap: transition already in progress")
+
 // swapCall is one in-progress swap that later callers can join.
 type swapCall struct {
 	done chan struct{}
@@ -155,8 +159,9 @@ func (c *Controller) Snapshot(ctx context.Context) (*scheduler.ClusterState, err
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	now := time.Now()
 	cs := &scheduler.ClusterState{
-		Now: time.Now(), GPU: c.GPU, Config: c.Config,
+		Now: now, GPU: c.GPU, Config: c.Config,
 		Models: make(map[scheduler.ModelID]*scheduler.Model, len(models)),
 	}
 
@@ -179,6 +184,22 @@ func (c *Controller) Snapshot(ctx context.Context) (*scheduler.ClusterState, err
 		known.Pinned = m.Pinned
 		known.InFlight = c.Fleet.InFlight(m.ID)
 		known.QueueDepth = c.Fleet.QueueDepth(m.ID)
+
+		// Release a transition that never completed.
+		//
+		// A model left in WAKING or STARTING is the worst possible state to be stuck
+		// in: it counts against the VRAM budget, it is never evictable ("transition
+		// in progress"), and it is never servable -- so it holds memory hostage and
+		// fails every request for itself, permanently. Any lost wake, agent restart
+		// or dropped goroutine can produce it. Time-bounding the state means the
+		// system recovers on its own instead of needing a restart.
+		if c.transitionStuck(known, now) {
+			c.Log.Warn("transition exceeded its deadline; releasing the model",
+				"model", known.ID, "state", known.State.String(),
+				"stuck_for", now.Sub(known.TransitionAt).Round(time.Second))
+			known.State = scheduler.StateFailed
+			metrics.SwapFailures.WithLabelValues(m.ID, "stuck_transition").Inc()
+		}
 
 		// A model whose footprint was never measured would be budgeted as free and
 		// could be admitted without evicting anything, overcommitting the device.
@@ -354,7 +375,7 @@ func (c *Controller) swapInWithRetry(ctx context.Context, id scheduler.ModelID,
 
 	for {
 		err := c.swapIn(ctx, id)
-		if !errors.Is(err, scheduler.ErrWouldThrash) {
+		if !errors.Is(err, scheduler.ErrWouldThrash) && !errors.Is(err, errTransitionInProgress) {
 			if call != nil {
 				call.setBlocked(nil)
 			}
@@ -373,6 +394,9 @@ func (c *Controller) swapInWithRetry(ctx context.Context, id scheduler.ModelID,
 		case <-ctx.Done():
 			return fmt.Errorf("model %q could not be admitted: %w", id, scheduler.ErrWouldThrash)
 		case <-giveUp:
+			if errors.Is(err, errTransitionInProgress) {
+				return fmt.Errorf("model %q was still loading after %s", id, thrashBudget)
+			}
 			// Report the thrash condition, not a context error: "every candidate was
 			// inside its residency window for the whole budget" is actionable,
 			// "deadline exceeded" is not.
@@ -433,6 +457,16 @@ func (c *Controller) swapIn(ctx context.Context, id scheduler.ModelID) error {
 		// "a drain is still in progress" is a diagnosis.
 		"blockers", cs.Blockers(id))
 
+	// A model already mid-transition produces a no-op plan: the planner's job is to
+	// avoid issuing a second wake for something already waking, which is what makes
+	// coalescing work. But a no-op plan is not the same as a servable model, and
+	// returning success here told the gateway to route to a replica that was still
+	// loading -- which then failed to find a ready one and answered 503. Signal that
+	// the caller should wait instead.
+	if target.State == scheduler.StateWaking || target.State == scheduler.StateStarting {
+		return errTransitionInProgress
+	}
+
 	plan, err := scheduler.NewPlanner(c.Policy).Plan(cs, id)
 	if err != nil {
 		if errors.Is(err, scheduler.ErrWouldThrash) {
@@ -453,6 +487,26 @@ func (c *Controller) swapIn(ctx context.Context, id scheduler.ModelID) error {
 		"estimated", plan.EstimatedCost)
 
 	return c.execute(ctx, cs, plan)
+}
+
+// transitionStuck reports whether a model has sat in a transitional state past the
+// deadline for it. The allowance is generous because a cold start of a large model
+// legitimately takes minutes; the point is that it is bounded at all.
+func (c *Controller) transitionStuck(m *scheduler.Model, now time.Time) bool {
+	var limit time.Duration
+	switch m.State {
+	case scheduler.StateWaking:
+		limit = 3 * time.Minute
+	case scheduler.StateStarting:
+		limit = c.swapTimeout()
+	case scheduler.StateDraining:
+		// Draining is already bounded by its own deadline inside drain(); this only
+		// catches a drain whose executor disappeared entirely.
+		limit = c.Config.DrainDeadline + time.Minute
+	default:
+		return false
+	}
+	return !m.TransitionAt.IsZero() && now.Sub(m.TransitionAt) > limit
 }
 
 // residentIDs lists the models the controller believes are holding VRAM, for the
@@ -693,6 +747,7 @@ func (c *Controller) setState(id scheduler.ModelID, s scheduler.State) {
 		c.state[id] = m
 	}
 	m.State = s
+	m.TransitionAt = time.Now()
 }
 
 // setStateResident marks a model ACTIVE and starts its minimum-residency clock. The
@@ -709,6 +764,7 @@ func (c *Controller) setStateResident(id scheduler.ModelID) {
 	}
 	m.State = scheduler.StateActive
 	m.ResidentSince = time.Now()
+	m.TransitionAt = time.Time{}
 }
 
 func (c *Controller) stateOf(id scheduler.ModelID) scheduler.State {
