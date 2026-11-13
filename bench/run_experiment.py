@@ -564,7 +564,13 @@ def main() -> int:
         ["cold", "lru", "lfu-decay", "cost-aware", "predictive-prewarm"]))
     ap.add_argument("--routers", default="round-robin,least-loaded,prefix-aware,prefix-aware+load")
     ap.add_argument("--traces", default="zipf_s10,bursty")
-    ap.add_argument("--min-residency", default="15s")
+    # 5s, not 15s. Minimum residency exists so an eviction's cost is not wasted by
+    # evicting again immediately, so it should be a few multiples of the wake cost --
+    # 0.6-1.8s on this fleet. Set longer than the typical gap between requests for a
+    # given model (~1.5s here across three models at 2 req/s), every model is almost
+    # always "freshly resident", nothing is ever evictable, and the scheduler simply
+    # stops making progress. That is a calibration error, not a policy result.
+    ap.add_argument("--min-residency", default="5s")
     ap.add_argument("--drain-deadline", default="10s")
     ap.add_argument("--gpu-bytes", type=int, default=8 * 1024**3)
     ap.add_argument("--gpu-reserve-bytes", type=int, default=1024**3)

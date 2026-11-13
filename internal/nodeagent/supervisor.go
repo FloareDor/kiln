@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+
+	"github.com/sairavig/kiln/internal/scheduler"
 )
 
 // Supervisor owns every vLLM process on one GPU and serialises the operations that
@@ -98,6 +100,20 @@ func (s *Supervisor) Start(ctx context.Context, spec Spec) (Status, error) {
 	if r.State().Serving() {
 		return r.Status(), nil
 	}
+
+	// "Start" means "make this replica servable", not "spawn a process". A sleeping
+	// replica already has one, so waking it is both correct and vastly cheaper than
+	// a cold start. Refusing here would make Start fail for exactly the states a
+	// caller is most likely to be recovering from: a retried deploy job, or a
+	// controller whose view of residency has drifted behind the agent's.
+	switch r.State() {
+	case scheduler.StateSleepingL1, scheduler.StateSleepingL2:
+		if err := r.Wake(ctx); err != nil {
+			return r.Status(), err
+		}
+		return r.Status(), nil
+	}
+
 	if err := r.Start(ctx); err != nil {
 		return r.Status(), err
 	}
