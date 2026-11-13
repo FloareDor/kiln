@@ -191,6 +191,10 @@ def run_locust(gateway: str, trace: pathlib.Path, out_csv: pathlib.Path,
         "--trace", str(trace),
         "--results", str(out_csv),
         "--only-summary",
+        # A failed request is data, not a harness error. Locust exits non-zero if any
+        # request failed, and under memory pressure a 503 is exactly the outcome the
+        # experiment is measuring -- treating it as a crash threw away the whole arm.
+        "--exit-code-on-error", "0",
     ]
     if api_key:
         cmd += ["--api-key", api_key]
@@ -201,7 +205,9 @@ def run_locust(gateway: str, trace: pathlib.Path, out_csv: pathlib.Path,
     # Never swallow a load generator's failure. check=False with captured output
     # meant a Locust that refused to start looked exactly like a run that produced
     # no traffic, and the arm silently recorded zero requests.
-    if proc.returncode != 0 or not out_csv.exists() or out_csv.stat().st_size == 0:
+    # Judge the run by whether it produced rows, not by its exit code: the exit code
+    # reflects request failures, which are the measurement.
+    if not out_csv.exists() or out_csv.stat().st_size == 0:
         tail = (proc.stderr or proc.stdout or "").strip().splitlines()[-12:]
         detail = "\n  ".join(tail)
         raise RuntimeError(
