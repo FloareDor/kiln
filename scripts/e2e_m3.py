@@ -40,6 +40,41 @@ def minikube_ip(profile: str) -> str:
     return out.stdout.strip().splitlines()[-1]
 
 
+class PortForward:
+    """A kubectl port-forward held open for the duration of a block.
+
+    NodePorts are advertised in the manifests and work from inside the cluster's
+    network, but minikube's docker driver does not route the node IP to a Windows
+    host, so a test running on the host cannot reach them. Port-forwarding is the
+    portable way to drive the cluster from outside it.
+    """
+
+    def __init__(self, profile: str, svc: str, local: int, remote: int) -> None:
+        self.p = subprocess.Popen(
+            ["kubectl", "--context", profile, "-n", "kiln", "port-forward",
+             f"svc/{svc}", f"{local}:{remote}"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.url = f"http://127.0.0.1:{local}"
+        self._await_ready()
+
+    def _await_ready(self, timeout: float = 60) -> None:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                requests.get(self.url + "/health", timeout=2)
+                return
+            except Exception:
+                try:
+                    requests.get(self.url, timeout=2)
+                    return
+                except Exception:
+                    time.sleep(0.5)
+        raise TimeoutError(f"port-forward to {self.url} never became reachable")
+
+    def close(self) -> None:
+        self.p.terminate()
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--profile", default="kiln")
@@ -53,9 +88,8 @@ def main() -> int:
 
     results: dict = {"checks": {}}
     ip = minikube_ip(args.profile)
-    gw = f"http://{ip}:30080"
-    prom = f"http://{ip}:30090"
-    print(f"cluster at {ip}  gateway={gw}")
+    print(f"cluster node at {ip} (NodePorts are not routable from a Windows host; "
+          f"driving the cluster through port-forwards)")
 
     print("\n[1/5] every component is running")
     pods = json.loads(kubectl("get", "pods", "-o", "json"))["items"]
@@ -89,15 +123,12 @@ def main() -> int:
     import base64
     admin_token = base64.b64decode(token).decode()
 
-    cp = f"http://{ip}:30082"
-    # The control plane has no NodePort by design (it is an internal API), so reach it
-    # by port-forward for the duration of the test.
-    pf = subprocess.Popen(
-        ["kubectl", "--context", args.profile, "-n", "kiln", "port-forward",
-         "svc/kiln-controlplane", "18082:8082"],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    time.sleep(4)
-    cp = "http://127.0.0.1:18082"
+    forwards = [
+        PortForward(args.profile, "kiln-controlplane", 18082, 8082),
+        PortForward(args.profile, "kiln-gateway", 18080, 8080),
+        PortForward(args.profile, "prometheus", 19090, 9090),
+    ]
+    cp, gw, prom = forwards[0].url, forwards[1].url, forwards[2].url
 
     def admin(method: str, path: str, **kw):
         return requests.request(method, cp + path,
@@ -169,7 +200,8 @@ def main() -> int:
         print(f"      targets: {targets}")
         print(f"      kiln_requests_total: {series[0]['value'][1] if series else 'none'}")
     finally:
-        pf.terminate()
+        for f in forwards:
+            f.close()
 
     results["PASS"] = all(results["checks"].values())
     out = REPO / args.out

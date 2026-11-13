@@ -300,6 +300,54 @@ Images now stream straight into the node's daemon over SSH
 (`docker save | minikube ssh docker load`), which also avoids writing a 23 GB tarball
 to disk on the way.
 
+### Finding: GPU workloads do not run under minikube on WSL2
+
+The stack deploys and every component is healthy, but a vLLM process started by the
+in-cluster node agent fails with:
+
+```
+RuntimeError: Unexpected error from cudaGetDeviceCount().
+Error 500: named symbol not found
+```
+
+This is an environment limitation, not a defect in Kiln, and it is worth writing down
+precisely because the symptom points in the wrong direction.
+
+What the pod actually sees:
+
+| | |
+|---|---|
+| `nvidia-smi` | **works** — reports the RTX 3070, driver 610.47, CUDA UMD 13.3 |
+| `nvidia.com/gpu` capacity | **1** — the device plugin advertises it, the pod is scheduled |
+| `/dev/dxg` | present |
+| `/dev/nvidia*` | **absent** |
+| `libcuda.so.1` | the 188 KB WSL forwarding stub |
+| `/usr/local/cuda/compat/libcuda.so.580.95.05` | a full driver library, shipped in the vLLM image |
+
+The cause is the third and fourth rows. On a normal Linux host the NVIDIA container
+toolkit injects `/dev/nvidia*` and the real driver library. Under WSL2 there is no
+`/dev/nvidia*` at all: GPU access is paravirtualised through `/dev/dxg` and the
+forwarding libraries in `/usr/lib/wsl/lib`, which minikube's node image does not
+propagate into pods. `nvidia-smi` keeps working because NVML's stub path is satisfied,
+which is exactly why the failure looks like a CUDA version mismatch rather than a
+missing passthrough. Disabling the image's CUDA compat directory does not help, so the
+problem is the passthrough itself and not library precedence.
+
+**Scope of the limitation.** It applies to this development machine's
+Windows → WSL2 → Docker Desktop → minikube → pod stack, which is four layers of
+virtualisation. It does not apply to a normal Linux GPU node, where `/dev/nvidia*` and
+the real `libcuda` are what the device plugin injects, and it does not apply to Modal,
+where the node agent runs as a plain container on a real Linux host. The node agent is
+built to run standalone without Kubernetes for exactly this reason.
+
+**What this does and does not establish.** Verified here: the manifests are correct,
+all eight pods come up, Postgres and the two control planes and two gateways and
+Prometheus and Grafana all work, the DaemonSet schedules onto the GPU node, and the
+architectural assertion holds — exactly one pod requests `nvidia.com/gpu` and it is
+the node agent. Not verified here: a model actually serving from inside the cluster.
+That path is covered by M1 and M2 running the same binaries natively against the same
+GPU, and will be covered again on Modal in M7.
+
 ### Notes
 
 - The gateway and control plane restarted four or five times while Postgres was

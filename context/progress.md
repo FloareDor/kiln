@@ -19,7 +19,7 @@ Last updated: 2026-11-13
 | M0 | Sanity check: vLLM sleep/wake frees + restores VRAM | done |
 | M1 | Gateway + node agent, one model, streaming | done |
 | M2 | Postgres, auth, quotas, deploy jobs | done |
-| M3 | Multiple replicas + Kubernetes | stack deployed; acceptance running |
+| M3 | Multiple replicas + Kubernetes | stack deployed + healthy; GPU blocked by WSL2 |
 | M4 | Observability + load testing | metrics + harness done; runs pending |
 | M5 | Model swapping (the main feature) | code done + 21 tests; experiments pending |
 | M6 | Prefix-aware routing | routers done + 18 tests; experiment pending |
