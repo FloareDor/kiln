@@ -291,10 +291,22 @@ def experiment_2(b: Bench) -> None:
     """
     print("\n=== experiment 2: sleep vs cold start ===")
     b.start_platform()
-    rows = []
+    rows, failures = [], []
     try:
         for model_id, repo, util in b.args.model_set:
-            st = b.deploy(model_id, repo, gpu_util=util)
+            # One model failing must not discard the others' measurements. Each of
+            # these costs minutes of GPU time, and a gated repo or a bad flag on the
+            # last model is no reason to throw away the first two.
+            try:
+                st = b.deploy(model_id, repo, gpu_util=util)
+            except Exception as exc:
+                print(f"  !! {model_id} failed, continuing: {exc}")
+                failures.append({"model": model_id, "error": str(exc)[:500]})
+                with contextlib.suppress(Exception):
+                    b.admin("DELETE", f"/admin/models/{model_id}")
+                    time.sleep(5)
+                continue
+
             cold_ms = st["cold_start_ms"]
             l1, l2 = st["wake_host_ms"], st["wake_disk_ms"]
             rows.append({
@@ -313,6 +325,10 @@ def experiment_2(b: Bench) -> None:
                 time.sleep(10)
     finally:
         b.stop_all()
+
+    if failures:
+        (RESULTS / "exp2_failures.json").write_text(json.dumps(failures, indent=2))
+        print(f"\n  {len(failures)} model(s) failed; recorded in exp2_failures.json")
 
     write_table("exp2_sleep_vs_cold", rows, notes=(
         "Measured by the deploy job on the local RTX 3070 (8 GB), vLLM 0.32.0, "
@@ -493,10 +509,12 @@ def main() -> int:
     else:
         # Small models so several fit, or nearly fit, on an 8GB card. The point of
         # the local fleet is memory pressure, not model quality.
+        # All openly licensed: a gated repo (Llama 3.2, for instance) 403s without a
+        # Hugging Face token, and a benchmark nobody else can run is not a benchmark.
         args.model_set = [
             ("qwen-0.5b", "Qwen/Qwen2.5-0.5B-Instruct", 0.30),
-            ("qwen3-0.6b", "Qwen/Qwen3-0.6B", 0.30),
-            ("llama-1b", "meta-llama/Llama-3.2-1B-Instruct", 0.32),
+            ("qwen3-0.6b", "Qwen/Qwen3-0.6B", 0.32),
+            ("qwen-1.5b", "Qwen/Qwen2.5-1.5B-Instruct", 0.42),
         ]
 
     RESULTS.mkdir(parents=True, exist_ok=True)

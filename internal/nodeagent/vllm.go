@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -114,6 +115,10 @@ type Replica struct {
 	cfg  Config
 
 	cmd     *exec.Cmd
+	// done is closed once the child has been reaped. Liveness cannot be tested with
+	// signal 0: an unreaped child becomes a zombie, and a zombie still accepts
+	// signals, so signal 0 reports a dead process as alive forever.
+	done    chan struct{}
 	port    int
 	state   scheduler.State
 	err     error
@@ -291,9 +296,18 @@ func (r *Replica) spawn() error {
 		return fmt.Errorf("nodeagent: spawn vllm: %w", err)
 	}
 
+	done := make(chan struct{})
 	r.mu.Lock()
-	r.cmd, r.logFile = cmd, f
+	r.cmd, r.logFile, r.done = cmd, f, done
 	r.mu.Unlock()
+
+	// Reap the child as soon as it exits and signal that through `done`. This is what
+	// lets a failed start -- a gated Hugging Face repo, a CUDA mismatch, bad flags --
+	// surface in seconds instead of after the full start timeout.
+	go func() {
+		_ = cmd.Wait()
+		close(done)
+	}()
 	return nil
 }
 
@@ -310,8 +324,8 @@ func (r *Replica) awaitReady(ctx context.Context, timeout time.Duration) error {
 		default:
 		}
 		if r.exited() {
-			return fmt.Errorf("nodeagent: vllm exited during startup; see %s",
-				filepath.Join(r.cfg.LogDir, sanitize(r.spec.Replica)+".log"))
+			return fmt.Errorf("nodeagent: vllm exited during startup (%s); see %s",
+				r.exitReason(), filepath.Join(r.cfg.LogDir, sanitize(r.spec.Replica)+".log"))
 		}
 		if err := r.probe(ctx); err == nil {
 			return nil
@@ -474,14 +488,65 @@ func (r *Replica) kill() {
 
 func (r *Replica) exited() bool {
 	r.mu.Lock()
+	done := r.done
 	cmd := r.cmd
 	r.mu.Unlock()
 	if cmd == nil || cmd.Process == nil {
 		return true
 	}
-	// Signal 0 tests for existence without delivering anything.
-	return syscall.Kill(cmd.Process.Pid, 0) != nil
+	if done == nil {
+		return false
+	}
+	select {
+	case <-done:
+		return true
+	default:
+		return false
+	}
 }
+
+// exitReason summarises why the child stopped, and pulls the last error-looking line
+// out of its log so the deploy job's error field says something an operator can act
+// on rather than just "exited".
+func (r *Replica) exitReason() string {
+	r.mu.Lock()
+	cmd := r.cmd
+	r.mu.Unlock()
+
+	reason := "unknown"
+	if cmd != nil && cmd.ProcessState != nil {
+		reason = fmt.Sprintf("exit status %d", cmd.ProcessState.ExitCode())
+	}
+	if hint := lastErrorLine(filepath.Join(r.cfg.LogDir, sanitize(r.spec.Replica)+".log")); hint != "" {
+		reason += ": " + hint
+	}
+	return reason
+}
+
+// lastErrorLine returns the final line of a log that looks like a Python exception.
+func lastErrorLine(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	// Only the tail matters, and a vLLM startup log can be megabytes.
+	const window = 32 << 10
+	if len(data) > window {
+		data = data[len(data)-window:]
+	}
+	lines := strings.Split(string(data), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		ln := strings.TrimSpace(lines[i])
+		// A Python traceback's final line is "SomeError: message", which is the one
+		// sentence worth surfacing.
+		if m := errLineRe.FindString(ln); m != "" && len(ln) < 400 {
+			return ln
+		}
+	}
+	return ""
+}
+
+var errLineRe = regexp.MustCompile(`^[A-Za-z_.]*(Error|Exception)[: ]`)
 
 func (r *Replica) fail(err error) {
 	r.mu.Lock()
