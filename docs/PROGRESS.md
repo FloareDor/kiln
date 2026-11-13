@@ -522,6 +522,55 @@ failed swap steps**.
 
 ---
 
+## Experiment 3 (eviction policy comparison): not run. Why.
+
+**The swapping mechanism is measured and works. The policy ranking is not claimed.**
+That distinction is deliberate, and this section exists so nobody reads a missing
+table as an oversight.
+
+### What the comparison needs, and why this GPU cannot provide it
+
+Comparing LRU against cost-aware against predictive-prewarm requires sustained memory
+pressure: more models wanted than fit, with evictions happening continuously. On an
+8 GB card with ~1.1 GB already held by the desktop, that means a fleet right at the
+edge of the device.
+
+At that edge, two things collide. Swap operations and inference contend for the same
+GPU, so with the card busy a wake that takes **0.59 s idle was measured at 81 s**.
+Throughput then collapses to about **0.14 req/s**, and a five-minute arm records
+roughly 40 requests -- too few for a trustworthy p95, and most of the latency being
+measured is contention rather than policy.
+
+Pushing load down to avoid saturation removes the memory pressure that the experiment
+is about. There is no setting of the dial that gives both on this hardware.
+
+### What is claimed instead
+
+- **The tiering mechanism, measured on hardware** (experiment 2 above): sleep frees
+  92% of a model's resident VRAM, and waking costs 0.59-1.54 s against a 35-37 s cold
+  start, 24x to 60x depending on model size.
+- **The policy implementations, verified by unit tests**: all five share one fitting
+  loop and differ only in a scoring function, and 29 scheduler tests pin down the
+  cases each is meant to handle -- LRU falling for a scan that lfu-decay resists,
+  cost-aware evicting one large cold model where LRU needs three small warm ones,
+  prewarming refusing to evict to make room for a guess.
+- **No claim about which policy wins under load.** Measuring that honestly needs a
+  GPU with headroom, which is what the Modal run in M7 is for.
+
+### The cost of finding this out
+
+Roughly two hours of GPU time across a dozen runs, and the admission is worth
+recording: the infeasibility was derivable up front. A 1.5B model needs 4.1 GB of a
+6.3 GB schedulable budget; one model taking two thirds of the device cannot coexist
+with anything, so eviction can never succeed. Arithmetic available before the first
+run would have said so. Instead it was discovered empirically, one run at a time.
+
+The runs were not wasted -- they found eleven real bugs, listed above, several of
+which only appear under concurrent load -- but the experiment itself was never going
+to work here.
+
+---
+
 ## Appendix - scheduler core (built early)
 
 Built early because it is pure logic that needs no GPU, so it could proceed while

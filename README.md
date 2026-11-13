@@ -182,9 +182,26 @@ All numbers measured on an **RTX 3070 Laptop (8 GB)** under WSL2, vLLM 0.32.0, `
 
 <sub>Reproduce: `make m1`, `make m2`.</sub>
 
-### Eviction policies and routing
+### Eviction policies
 
-Run with `make bench EXP=3` and `make bench EXP=5`. Each arm replays the **identical recorded trace** from `bench/traces/`, so the only variable is the policy or the router.
+> [!NOTE]
+> **The policy ranking is not claimed, and the table is deliberately absent.**
+> Comparing LRU against cost-aware needs sustained memory pressure, and on an 8 GB
+> card that means running at the edge of the device — where swap operations contend
+> with inference and a wake measured at 0.59 s idle took **81 s** under load.
+> Throughput collapses to ~0.14 req/s, so an arm records ~40 requests and most of the
+> latency measured is contention, not policy. Backing the load off removes the
+> pressure the experiment is about. There is no setting that gives both here.
+>
+> What *is* claimed: the mechanism above, measured on hardware, and the five policy
+> implementations, covered by 29 unit tests that pin down the case each one exists
+> for. Which policy wins under load needs a GPU with headroom — see
+> [`docs/PROGRESS.md`](docs/PROGRESS.md) for the full reasoning and what it cost to
+> establish.
+
+### Routing
+
+Run with `make bench EXP=5`. Each arm replays the **identical recorded trace** from `bench/traces/`, so the only variable is the router.
 
 ---
 

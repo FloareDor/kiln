@@ -21,8 +21,8 @@ Last updated: 2026-11-13
 | M2 | Postgres, auth, quotas, deploy jobs | done |
 | M3 | Multiple replicas + Kubernetes | stack deployed + healthy; GPU blocked by WSL2 |
 | M4 | Observability + load testing | metrics + harness done; runs pending |
-| M5 | Model swapping (the main feature) | working + measured; policy table running |
-| M6 | Prefix-aware routing | routers done + 18 tests; experiment pending |
+| M5 | Model swapping (the main feature) | mechanism measured; policy A/B dropped (see PROGRESS) |
+| M6 | Prefix-aware routing | routers done + 18 tests; experiment running |
 | M7 | Modal scale run + README polish | README + diagrams done; Modal pending |
 
 ## Done
@@ -53,13 +53,19 @@ replacement: DONE after 2 attempts. Three real bugs found and fixed, written up 
 `docs/PROGRESS.md`.
 
 ## Next up
-**Finish the results tables, then Modal.** The swapping mechanism works and is
-measured; five bugs found by running it are written up in `docs/PROGRESS.md`.
+**Prefix-aware routing (M6), then polish.** The eviction policy A/B is dropped: it
+needs sustained memory pressure, and on an 8 GB card that means saturation, where
+swaps contend with inference and a 0.59 s wake becomes 81 s. The swapping *mechanism*
+is measured and banked (experiment 2); the policy *ranking* is not claimed. Reasoning
+is written up in `docs/PROGRESS.md`.
 
-1. Experiment 3 (five policies x two traces) - running.
-2. Experiment 5 (four routers on agent traffic).
-3. Experiment 1 (replica sweep) if the GPU budget allows two replicas.
-4. Modal run with a 7-8B model, Grafana screenshot, demo GIF, README numbers.
+Routing is the right experiment for this hardware: two replicas of one 0.5B model is
+3.6 GB, so there is no memory pressure, no swap/inference contention, and throughput
+is normal -- p50 and p95 both become trustworthy.
+
+1. Experiment 5 (four routers on agent traffic) - running.
+2. Fill the README's open tables with experiment 2 and 5 results.
+3. Modal run for a GPU with headroom, if time allows.
 
 ## Decisions
 - **Dev environment is WSL2 Ubuntu, not native Windows.** vLLM has no Windows build.
