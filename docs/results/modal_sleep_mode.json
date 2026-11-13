@@ -1,0 +1,109 @@
+{
+  "vllm_version": "0.32.0",
+  "torch_version": "2.13.0+cu130",
+  "gpu": "NVIDIA A10",
+  "gpu_total_mib": 23028,
+  "idle_baseline_mib": 445,
+  "per_process_nvml": false,
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "gpu_memory_utilization": 0.85,
+  "max_model_len": 2048,
+  "samples": [
+    {
+      "label": "baseline (no server)",
+      "device_used_mib": 445,
+      "vllm_mib": 0,
+      "proc_used_mib": 0,
+      "elapsed_s": 0.0,
+      "note": ""
+    },
+    {
+      "label": "ACTIVE (cold start)",
+      "device_used_mib": 19602,
+      "vllm_mib": 19157,
+      "proc_used_mib": 0,
+      "elapsed_s": 112.72,
+      "note": "ref=' Paris. Which of the following statements about Paris is true?\\n'"
+    },
+    {
+      "label": "SLEEPING_L1",
+      "device_used_mib": 830,
+      "vllm_mib": 385,
+      "proc_used_mib": 0,
+      "elapsed_s": 6.09,
+      "note": "is_sleeping=True"
+    },
+    {
+      "label": "ACTIVE (woke from L1)",
+      "device_used_mib": 19656,
+      "vllm_mib": 19211,
+      "proc_used_mib": 0,
+      "elapsed_s": 1.63,
+      "note": "out=' Paris. Which of the following statements about Paris is true?\\n' OK"
+    },
+    {
+      "label": "SLEEPING_L2",
+      "device_used_mib": 830,
+      "vllm_mib": 385,
+      "proc_used_mib": 0,
+      "elapsed_s": 0.17,
+      "note": "is_sleeping=True"
+    },
+    {
+      "label": "ACTIVE (L2 wake, no reload)",
+      "device_used_mib": 19656,
+      "vllm_mib": 19211,
+      "proc_used_mib": 0,
+      "elapsed_s": 1.23,
+      "note": "out='!!!!!!!!!!!!' GARBAGE (expected)"
+    },
+    {
+      "label": "ACTIVE (L2 wake + reload)",
+      "device_used_mib": 20696,
+      "vllm_mib": 20251,
+      "proc_used_mib": 0,
+      "elapsed_s": 4.37,
+      "note": "out=' Paris. Which of the following statements about Paris is true?\\n' OK"
+    },
+    {
+      "label": "after shutdown",
+      "device_used_mib": 445,
+      "vllm_mib": 0,
+      "proc_used_mib": 0,
+      "elapsed_s": 0.0,
+      "note": ""
+    },
+    {
+      "label": "ACTIVE (2nd cold start)",
+      "device_used_mib": 19602,
+      "vllm_mib": 19157,
+      "proc_used_mib": 0,
+      "elapsed_s": 36.76,
+      "note": "warm page cache"
+    }
+  ],
+  "verdict": {
+    "measurement": "device-wide minus idle baseline",
+    "resident_mib": 19157,
+    "freed_by_l1_mib": 18772,
+    "freed_by_l2_mib": 18772,
+    "freed_by_l1_pct": 98.0,
+    "freed_by_l2_pct": 98.0,
+    "cold_start_s": 112.72,
+    "cold_start_warm_cache_s": 36.76,
+    "sleep_l1_s": 6.09,
+    "wake_l1_s": 1.63,
+    "sleep_l2_s": 0.17,
+    "wake_l2_naive_s": 1.23,
+    "wake_l2_with_reload_s": 4.37,
+    "speedup_l1_vs_cold": 22.55,
+    "speedup_l2_vs_cold": 8.41,
+    "checks": {
+      "l1_output_matches": true,
+      "l2_naive_output_matches": false,
+      "l2_reload_output_matches": true
+    },
+    "reference_output": " Paris. Which of the following statements about Paris is true?\n",
+    "PASS": true
+  }
+}

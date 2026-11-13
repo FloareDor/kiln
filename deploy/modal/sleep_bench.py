@@ -29,11 +29,14 @@ VLLM_VERSION = "0.32.0"
 # Installing vLLM onto a bare CUDA base works but risks a different driver/runtime
 # pairing than the local run, which would make the comparison meaningless.
 image = (
-    modal.Image.from_registry(
-        f"vllm/vllm-openai:v{VLLM_VERSION}",
-        add_python="3.12",
-    )
+    # No add_python: that installs a second interpreter alongside the image's own,
+    # and vLLM and torch live in the image's. The benchmark then starts cleanly and
+    # fails on `import torch` several minutes in.
+    modal.Image.from_registry(f"vllm/vllm-openai:v{VLLM_VERSION}")
     .entrypoint([])  # the base image launches vLLM directly; we drive it ourselves
+    # The vLLM image ships python3 but no `python`, and Modal's builder and runtime
+    # both invoke `python`. Link it before anything else tries to use it.
+    .run_commands("ln -sf $(command -v python3) /usr/local/bin/python")
     .pip_install("nvidia-ml-py", "requests", "huggingface_hub")
     .env({
         # Gates /sleep, /wake_up and /collective_rpc. Without it those endpoints 404

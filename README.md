@@ -73,6 +73,9 @@ returns `200` in 0.45s and then generates nonsense. The fix is to follow it with
 four times *faster* than the correct one, so a benchmark that only timed things would
 have ranked it first. Every wake is now checked against a pre-sleep reference string.
 
+The same thing happens on an A10 with a 7B model — 1.23 s and `'!!!!!!!!!!!!'` — so it
+is vLLM's behaviour rather than anything about this machine.
+
 ## Quick Start
 
 ```bash
@@ -151,17 +154,29 @@ Check `nvidia-smi` works before going further.
 ## Tiering
 
 When more models are wanted than fit in VRAM, idle ones get paged out rather than
-unloaded. Measured on an RTX 3070 Laptop (8 GB), vLLM 0.32.0, eager mode:
+unloaded. vLLM 0.32.0, eager mode:
 
-| Model | Resident VRAM | Cold start | Wake from CPU RAM | Wake from disk |
-|---|---|---|---|---|
-| Qwen2.5-0.5B | 2458 MiB | 35.3 s | 0.59 s | 0.71 s |
-| Qwen3-0.6B | 2621 MiB | 35.9 s | 0.82 s | 1.05 s |
-| Qwen2.5-1.5B | 4506 MiB | 37.4 s | 1.54 s | 1.81 s |
+| Model | GPU | Resident VRAM | Cold start | Wake from CPU RAM | Wake from disk |
+|---|---|---|---|---|---|
+| Qwen2.5-0.5B | RTX 3070 8 GB | 2458 MiB | 35.3 s | 0.59 s | 0.71 s |
+| Qwen3-0.6B | RTX 3070 8 GB | 2621 MiB | 35.9 s | 0.82 s | 1.05 s |
+| Qwen2.5-1.5B | RTX 3070 8 GB | 4506 MiB | 37.4 s | 1.54 s | 1.81 s |
+| **Qwen2.5-7B** | **A10 24 GB** | **19157 MiB** | **36.8 s** | **1.63 s** | **4.37 s** |
 
-Cold start barely moves with model size, because it is mostly process spawn, CUDA
-init and memory profiling rather than reading weights. Wake cost does scale with the
-weights, so the gap narrows from 60x to 24x as models grow.
+The 7B row is the one worth looking at: sleeping it frees **18.7 GB in 6.1 s and
+restores it in 1.63 s**, which is 98% of its resident memory. The equivalent cold
+start is 36.8 s with the weights already in the page cache, or 113 s the first time
+when they still have to be read from disk.
+
+Cold start barely moves with model size — 35 s for a 0.5B and 37 s for a 7B — because
+it is mostly process spawn, CUDA init and memory profiling rather than reading
+weights. Wake cost does scale with the weights, so the ratio narrows from 60x at 0.5B
+to 23x at 7B. The absolute saving goes the other way: 34 s saved at 0.5B, 35 s at 7B
+against a warm cache and 111 s against a cold one.
+
+The fraction of memory recovered improves with size too, from 92% at 0.5B to 98% at
+7B, because the ~230-400 MiB of CUDA context a sleeping model keeps is fixed overhead
+that a larger model amortises.
 
 Every model moves through one state machine:
 

@@ -23,7 +23,7 @@ Last updated: 2026-11-13
 | M4 | Observability + load testing | done: metrics, dashboard, traces, Locust |
 | M5 | Model swapping (the main feature) | mechanism measured; policy A/B dropped (see PROGRESS) |
 | M6 | Prefix-aware routing | done: 12x p50 vs round-robin, hot spot shown |
-| M7 | Modal scale run + README polish | README + diagrams done; Modal pending |
+| M7 | Modal scale run + README polish | done: 7B on an A10, 18.7 GB freed in 6.1 s |
 
 ## Done
 **M0 - sleep mode verified.** vLLM 0.32.0 pinned. Sleep L1 and L2 each return 92% of a
@@ -53,16 +53,16 @@ replacement: DONE after 2 attempts. Three real bugs found and fixed, written up 
 `docs/PROGRESS.md`.
 
 ## Next up
-**Polish, then Modal if time allows.** Everything the hardware can measure has been
-measured.
+**All eight milestones are done.** Everything this hardware and a rented A10 can
+measure has been measured, and the repository is public at
+https://github.com/FloareDor/kiln.
 
-- M6 routing is done and is the clearest result in the project: prefix affinity gives
-  12x better p50 than round-robin and 3x better than least-loaded, and the pure-affinity
-  arm routes 81/81 requests to one replica, which shows the hot spot the load-penalised
-  variant exists to fix.
-- The eviction policy A/B stays dropped; it needs a GPU with headroom.
-- Remaining: Modal run on a larger GPU for the policy comparison, and a demo recording
-  if there is time.
+Optional work that remains:
+
+- The eviction policy A/B, which was dropped deliberately. It needs a GPU with
+  headroom; the Modal path now exists and could carry it.
+- A recorded demo of the deploy-and-stream flow.
+- Multi-node placement, which currently just sorts agents by free VRAM.
 
 ## Decisions
 - **Dev environment is WSL2 Ubuntu, not native Windows.** vLLM has no Windows build.

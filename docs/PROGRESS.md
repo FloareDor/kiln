@@ -628,6 +628,67 @@ the other does not.
 
 ---
 
+## M7 - Modal scale run
+
+**Status: done. The same verification script, a 7B model, an A10.**
+
+The local numbers come from an 8 GB laptop card, which caps the model at about 1.5B.
+The open question was whether the ratio holds at a size anyone would actually serve.
+This runs `scripts/verify_sleep_mode.py` unchanged on Modal so the two sets of numbers
+are directly comparable -- same vLLM version, same flags, same correctness check.
+
+### Qwen2.5-7B-Instruct on an NVIDIA A10 (24 GB), vLLM 0.32.0, eager
+
+| step | device MiB | vLLM MiB | time | result |
+|---|---|---|---|---|
+| baseline, no server | 445 | 0 | - | |
+| ACTIVE after cold start | 19602 | 19157 | 112.72 s | first load, weights read from disk |
+| SLEEPING_L1 | 830 | 385 | 6.09 s | 18.7 GB copied to host RAM |
+| ACTIVE, woke from L1 | 19656 | 19211 | **1.63 s** | output matches reference |
+| SLEEPING_L2 | 830 | 385 | 0.17 s | weights dropped |
+| ACTIVE, L2 wake without reload | 19656 | 19211 | 1.23 s | **garbage output** |
+| ACTIVE, L2 wake + reload_weights | 20696 | 20251 | **4.37 s** | output matches reference |
+| ACTIVE, second cold start | 19602 | 19157 | 36.76 s | warm page cache |
+
+**98.0% of resident VRAM freed** -- 18772 MiB of 19157. Gate passed.
+
+### What this adds over the local numbers
+
+**The absolute saving grows while the ratio shrinks.** At 0.5B, waking is 60x cheaper
+than a cold start; at 7B it is 23x. But the time saved is 34 s against 35 s -- and
+against a genuinely cold page cache, 111 s. The ratio falls because wake cost scales
+with the weights while cold start does not, and the ratio is the less interesting
+number: what a user waits for is the absolute figure.
+
+**Cold start really is size-independent.** 35 s for a 0.5B on a laptop GPU, 37 s for a
+7B on an A10, with weights cached both times. It is process spawn, CUDA
+initialisation, memory profiling and graph setup, not reading weights. This was
+inferred from three small models locally; the 7B confirms it across a 14x jump in
+model size and a different GPU.
+
+**The recovered fraction improves with size**, 92% to 98%, because the CUDA context a
+sleeping model retains is roughly fixed (230-400 MiB) and a larger model amortises it.
+
+**The level-2 wake bug is vLLM's, not the environment's.** It reproduces exactly on an
+A10 with a 7B model and no WSL2 anywhere: `/wake_up` returns in 1.23 s and generates
+`'!!!!!!!!!!!!'`, and the correct path with `collective_rpc{"method":
+"reload_weights"}` takes 4.37 s. A timing-only benchmark would rank the broken path
+first on both machines.
+
+### Getting there
+
+Three attempts, both failures in the image rather than the measurement:
+
+- `from_registry(..., add_python="3.12")` installs a second interpreter alongside the
+  image's own, and vLLM and torch live in the image's. The run started cleanly and
+  failed on `import torch` minutes later.
+- The vLLM image ships `python3` but no `python`, which Modal's builder invokes.
+  Fixed with a symlink as the first build step.
+
+Reproduce with `modal run --detach deploy/modal/sleep_bench.py`.
+
+---
+
 ## Appendix - scheduler core (built early)
 
 Built early because it is pure logic that needs no GPU, so it could proceed while
