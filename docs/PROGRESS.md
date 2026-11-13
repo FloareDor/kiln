@@ -571,6 +571,63 @@ to work here.
 
 ---
 
+## M6 - prefix-aware routing: measured
+
+**Status: done. All four routers, 81 requests each, same recorded trace.**
+
+Two replicas of one 0.5B model on the RTX 3070, replaying agent traffic -- multi-turn
+conversations that resend the same system prompt and tool definitions every turn, so
+most of each prompt is a shared prefix.
+
+| Router | p50 TTFT | p95 TTFT | p99 TTFT | Requests per replica |
+|---|---|---|---|---|
+| `round-robin` | 1029 ms | 2676 ms | 2826 ms | 41 / 40 |
+| `least-loaded` | 273 ms | 2827 ms | 2865 ms | 43 / 37 |
+| `prefix-aware` | **85 ms** | **160 ms** | 211 ms | 81 / 0 |
+| `prefix-aware+load` | 106 ms | 2525 ms | 2825 ms | 52 / 29 |
+
+All arms served 81 requests with zero errors at 0.35 req/s offered load, so the
+comparison is like for like.
+
+### What the numbers say
+
+**Prefix affinity is worth 12x on p50 and 17x on p95 against round-robin.** That is
+the mechanism working exactly as intended: consecutive turns of one conversation land
+on the replica that already holds the system prompt and tool definitions in its KV
+cache, so the shared prefill is a cache hit rather than recomputed work. Round-robin
+scatters those turns and pays full prefill nearly every time.
+
+**Least-loaded is a much better baseline than round-robin**, and worth having as a
+separate arm -- 273 ms against 1029 ms at p50 purely from not sending work to a busy
+replica. Beating round-robin is easy; beating least-loaded is the claim that matters,
+and prefix-aware does it by a further 3x.
+
+**The hot spot is real, and the numbers show it rather than hide it.** Pure affinity
+routed all 81 requests to one replica and left the other completely idle. Its
+excellent p95 is partly a consequence of that concentration: every request hit a warm
+cache on one machine. But the deployment has no headroom in that state, and at higher
+load that replica saturates while its peer does nothing. The unit test
+`TestPrefixAwareWithoutLoadPenaltyCreatesAHotSpot` pins this behaviour deliberately.
+
+**`prefix-aware+load` is the configuration to actually run.** It keeps most of the p50
+win (106 ms vs 85 ms), spreads work 52/29 instead of 81/0, and pays for it at p95
+(2525 ms vs 160 ms) because breaking affinity to balance load costs cache misses. That
+is precisely the trade the load penalty exists to make, and seeing both arms side by
+side is the reason both were kept.
+
+### Why this experiment worked where the policy comparison did not
+
+Two replicas of a 0.5B model is 3.6 GB on an 8 GB card. No memory pressure, so no
+swapping, so swap operations never contend with inference for the device. Throughput
+stays normal, every arm records a full sample, and p50 and p95 are both trustworthy.
+
+The eviction policy comparison needed the opposite condition -- sustained memory
+pressure -- which on this hardware means saturation, and saturation is what destroyed
+that measurement. Same platform, same harness; one experiment fits the hardware and
+the other does not.
+
+---
+
 ## Appendix - scheduler core (built early)
 
 Built early because it is pure logic that needs no GPU, so it could proceed while

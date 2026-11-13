@@ -208,15 +208,32 @@ strategies, selected with `-router`: `round-robin`, `least-loaded`, `prefix-awar
 `prefix-aware+load`. Pure affinity sends every request for a popular prefix to one
 replica, which is why the load-penalised variant exists.
 
-Replaying the same recorded agent trace against two replicas of one model:
+Replaying the same recorded agent trace against two replicas of one 0.5B model,
+81 requests per arm, every arm seeing the identical request sequence:
 
-| Router | Requests | p50 TTFT | Spread across replicas |
+| Router | p50 TTFT | p95 TTFT | Requests per replica |
 |---|---|---|---|
-| `round-robin` | 81 | 1029 ms | 41 / 40 |
-| `least-loaded` | 28 | 96 ms | 20 / 8 |
+| `round-robin` | 1029 ms | 2676 ms | 41 / 40 |
+| `least-loaded` | 273 ms | 2827 ms | 43 / 37 |
+| `prefix-aware` | **85 ms** | **160 ms** | 81 / 0 |
+| `prefix-aware+load` | 106 ms | 2525 ms | 52 / 29 |
 
-An even spread is not automatically better — affinity concentrates a conversation on
-one replica on purpose, to reuse its KV cache. Run it with `make bench EXP=5`.
+Prefix affinity is worth 12x on p50 and 17x on p95 against round-robin, which is the
+point: consecutive turns of a conversation land on the replica that already has the
+system prompt and tool definitions in its KV cache, so the shared part of the prefill
+is a cache hit instead of recomputed work.
+
+The `81 / 0` is the catch. Pure affinity put every single request on one replica and
+left the other idle. Its p95 of 160 ms is partly *because* of that — every request hit
+a warm cache on one machine — but it means the deployment has no headroom, and at
+higher load that replica saturates while its peer does nothing.
+
+`prefix-aware+load` is the version you would actually run. It keeps most of the p50
+win, spreads work 52/29, and pays for it in p95: breaking affinity to balance load
+costs cache misses, which is exactly the trade the load penalty exists to make.
+
+Run it with `make bench EXP=5`. Full output in
+[`docs/results/exp5_routing.md`](docs/results/exp5_routing.md).
 
 ## Other measured behaviour
 

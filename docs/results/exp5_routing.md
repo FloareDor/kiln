@@ -1,0 +1,10 @@
+# exp5_routing
+
+Agent-style traffic: multi-turn conversations resending the same system prompt and tool definitions each turn. `replica_spread` shows how evenly work landed, which is where pure prefix affinity pays for its cache hits.
+
+| arm | requests | offered_rps | ok | errors | ttft_p50_ms | ttft_p95_ms | ttft_p99_ms | total_p50_ms | total_p95_ms | completion_tokens | tokens_per_s | requests_per_s | router | replica_spread | max_replica_share |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| round-robin | 81 | 0.35 | 81 | 0 | 1028.8 | 2676.4 | 2825.6 | 1560.2 | 3334.3 | 1276 | 5.5 | 0.35 | round-robin | 41/40 | 0.506 |
+| least-loaded | 80 | 0.35 | 80 | 0 | 272.8 | 2827.1 | 2864.6 | 1518.2 | 3413.8 | 1259 | 5.4 | 0.35 | least-loaded | 43/37 | 0.537 |
+| prefix-aware | 81 | 0.35 | 81 | 0 | 85.4 | 160.0 | 211.1 | 529.5 | 680.5 | 1275 | 5.5 | 0.35 | prefix-aware | 81 | 1.0 |
+| prefix-aware+load | 81 | 0.35 | 81 | 0 | 106.3 | 2525.2 | 2825.3 | 675.1 | 3298.0 | 1276 | 5.5 | 0.35 | prefix-aware+load | 52/29 | 0.642 |

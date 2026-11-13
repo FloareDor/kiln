@@ -20,9 +20,9 @@ Last updated: 2026-11-13
 | M1 | Gateway + node agent, one model, streaming | done |
 | M2 | Postgres, auth, quotas, deploy jobs | done |
 | M3 | Multiple replicas + Kubernetes | stack deployed + healthy; GPU blocked by WSL2 |
-| M4 | Observability + load testing | metrics + harness done; runs pending |
+| M4 | Observability + load testing | done: metrics, dashboard, traces, Locust |
 | M5 | Model swapping (the main feature) | mechanism measured; policy A/B dropped (see PROGRESS) |
-| M6 | Prefix-aware routing | routers done + 18 tests; experiment running |
+| M6 | Prefix-aware routing | done: 12x p50 vs round-robin, hot spot shown |
 | M7 | Modal scale run + README polish | README + diagrams done; Modal pending |
 
 ## Done
@@ -53,19 +53,16 @@ replacement: DONE after 2 attempts. Three real bugs found and fixed, written up 
 `docs/PROGRESS.md`.
 
 ## Next up
-**Prefix-aware routing (M6), then polish.** The eviction policy A/B is dropped: it
-needs sustained memory pressure, and on an 8 GB card that means saturation, where
-swaps contend with inference and a 0.59 s wake becomes 81 s. The swapping *mechanism*
-is measured and banked (experiment 2); the policy *ranking* is not claimed. Reasoning
-is written up in `docs/PROGRESS.md`.
+**Polish, then Modal if time allows.** Everything the hardware can measure has been
+measured.
 
-Routing is the right experiment for this hardware: two replicas of one 0.5B model is
-3.6 GB, so there is no memory pressure, no swap/inference contention, and throughput
-is normal -- p50 and p95 both become trustworthy.
-
-1. Experiment 5 (four routers on agent traffic) - running.
-2. Fill the README's open tables with experiment 2 and 5 results.
-3. Modal run for a GPU with headroom, if time allows.
+- M6 routing is done and is the clearest result in the project: prefix affinity gives
+  12x better p50 than round-robin and 3x better than least-loaded, and the pure-affinity
+  arm routes 81/81 requests to one replica, which shows the hot spot the load-penalised
+  variant exists to fix.
+- The eviction policy A/B stays dropped; it needs a GPU with headroom.
+- Remaining: Modal run on a larger GPU for the policy comparison, and a demo recording
+  if there is time.
 
 ## Decisions
 - **Dev environment is WSL2 Ubuntu, not native Windows.** vLLM has no Windows build.

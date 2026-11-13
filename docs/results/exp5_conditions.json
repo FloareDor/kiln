@@ -1,0 +1,20 @@
+{
+  "experiment": 5,
+  "when": "2026-11-13 11:24:01",
+  "duration": "4m",
+  "users": 4,
+  "policies": "cold,lru,lfu-decay,cost-aware,predictive-prewarm",
+  "routers": "round-robin,least-loaded,prefix-aware,prefix-aware+load",
+  "traces": "zipf_s10,bursty",
+  "models": [
+    [
+      "q05a",
+      "Qwen/Qwen2.5-0.5B-Instruct",
+      0.26
+    ]
+  ],
+  "gpu_bytes": 8589934592,
+  "gpu_reserve_bytes": 1073741824,
+  "min_residency": "5s",
+  "drain_deadline": "2s"
+}
