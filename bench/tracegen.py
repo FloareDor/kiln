@@ -233,11 +233,15 @@ def main() -> int:
     ap.add_argument("--rate", type=float, default=2.0, help="requests per second")
     ap.add_argument("--seed", type=int, default=20261113)
     ap.add_argument("--teams", default="team-a,team-b,team-c")
+    ap.add_argument("--models", default="",
+                    help="comma-separated model ids; defaults to the local fleet. Must match "
+                         "the models the experiment deploys, or part of the trace addresses "
+                         "models that do not exist and silently measures nothing.")
     args = ap.parse_args()
 
     out = pathlib.Path(args.out)
     teams = args.teams.split(",")
-    models = [m for m, _ in LOCAL_MODELS]
+    models = [m.strip() for m in args.models.split(",") if m.strip()] or [m for m, _ in LOCAL_MODELS]
 
     print(f"generating traces into {out} (seed {args.seed})")
 

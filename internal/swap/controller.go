@@ -77,6 +77,8 @@ type Controller struct {
 	Config  scheduler.Config
 	GPU     scheduler.GPU
 	Log     *slog.Logger
+	// SwapTimeout bounds a detached swap. Zero means 15 minutes.
+	SwapTimeout time.Duration
 
 	// mu guards state. Every residency transition is recorded here, and the GPU is
 	// mutated only while holding swapMu.
@@ -100,6 +102,25 @@ type Controller struct {
 type swapCall struct {
 	done chan struct{}
 	err  error
+
+	// blocked records why the swap has not finished yet, so a caller that gives up
+	// can say something more useful than "deadline exceeded". Without it, a request
+	// that waited out its whole budget behind the anti-thrash guard reports a bare
+	// timeout and the operator has no idea the GPU was contended rather than slow.
+	mu      sync.Mutex
+	blocked error
+}
+
+func (s *swapCall) setBlocked(err error) {
+	s.mu.Lock()
+	s.blocked = err
+	s.mu.Unlock()
+}
+
+func (s *swapCall) blockedErr() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.blocked
 }
 
 // New builds a controller.
@@ -194,26 +215,87 @@ func (c *Controller) Ensure(ctx context.Context, model string) error {
 	if call, ok := c.inflightSwaps[id]; ok {
 		c.flightMu.Unlock()
 		metrics.ResidencyMisses.WithLabelValues(model, "coalesced").Inc()
-		select {
-		case <-call.done:
-			return call.err
-		case <-ctx.Done():
-			return fmt.Errorf("waiting for an in-progress wake of %q: %w", model, ctx.Err())
-		}
+		return c.await(ctx, call, model)
 	}
 	call := &swapCall{done: make(chan struct{})}
 	c.inflightSwaps[id] = call
 	c.flightMu.Unlock()
 
-	defer func() {
-		c.flightMu.Lock()
-		delete(c.inflightSwaps, id)
-		c.flightMu.Unlock()
-		close(call.done)
+	// Run the swap on a context detached from the caller's.
+	//
+	// This is not a nicety. A swap is a sequence of GPU state transitions with real
+	// side effects, and it is shared: fifty requests coalesce onto one wake. Binding
+	// it to the triggering request's context means that whenever that one client
+	// times out or disconnects, the wake is aborted part-way through -- leaving a
+	// model neither asleep nor resident, failing every request that was waiting on
+	// it, and losing the work. A benchmark run ending was enough to cancel every
+	// swap in flight, which is how this was found.
+	//
+	// So the swap runs to completion or fails on its own terms, and the caller
+	// merely waits for it. A client that gives up stops waiting; the model still
+	// becomes resident, which is what the next request wants anyway.
+	swapCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), c.swapTimeout())
+	go func() {
+		defer cancel()
+		defer close(call.done)
+		defer func() {
+			c.flightMu.Lock()
+			delete(c.inflightSwaps, id)
+			c.flightMu.Unlock()
+		}()
+		call.err = c.swapInWithRetry(swapCtx, id, c.thrashBudget(ctx), call)
 	}()
 
-	call.err = c.swapInWithRetry(ctx, id)
-	return call.err
+	return c.await(ctx, call, model)
+}
+
+// await blocks until the swap finishes or the caller gives up.
+func (c *Controller) await(ctx context.Context, call *swapCall, model string) error {
+	select {
+	case <-call.done:
+		return call.err
+	case <-ctx.Done():
+		// The swap keeps running; only this caller stops waiting. Report what it was
+		// waiting on, which is the actionable part.
+		if blocked := call.blockedErr(); blocked != nil {
+			return fmt.Errorf("gave up waiting for %q to become servable: %w", model, blocked)
+		}
+		return fmt.Errorf("gave up waiting for %q to become servable: %w", model, ctx.Err())
+	}
+}
+
+// swapTimeout bounds a detached swap. Generous, because a cold start of a large model
+// legitimately takes minutes, and abandoning one half-done is worse than waiting.
+func (c *Controller) swapTimeout() time.Duration {
+	if c.SwapTimeout > 0 {
+		return c.SwapTimeout
+	}
+	return 15 * time.Minute
+}
+
+// thrashBudget is how long to keep retrying a swap that is blocked only by the
+// anti-thrash guard.
+//
+// Bounded by the caller's own deadline rather than by the detached swap timeout:
+// retrying for fifteen minutes to satisfy a request that gave up after three would
+// be pure waste, and unlike a wake in progress there is no work to protect — nothing
+// has touched the GPU yet.
+func (c *Controller) thrashBudget(ctx context.Context) time.Duration {
+	const (
+		floor = 5 * time.Second
+		ceil  = 2 * time.Minute
+	)
+	budget := ceil
+	if deadline, ok := ctx.Deadline(); ok {
+		budget = time.Until(deadline)
+	}
+	if budget > ceil {
+		budget = ceil
+	}
+	if budget < floor {
+		budget = floor
+	}
+	return budget
 }
 
 // swapInWithRetry retries while the only obstacle is the anti-thrash guard.
@@ -227,17 +309,22 @@ func (c *Controller) Ensure(ctx context.Context, model string) error {
 //
 // The wait is bounded by the caller's context, which the gateway sets from its queue
 // timeout, so a request still fails eventually rather than hanging forever.
-func (c *Controller) swapInWithRetry(ctx context.Context, id scheduler.ModelID) error {
+func (c *Controller) swapInWithRetry(ctx context.Context, id scheduler.ModelID,
+	thrashBudget time.Duration, call *swapCall) error {
 	const (
 		minBackoff = 150 * time.Millisecond
 		maxBackoff = 2 * time.Second
 	)
 	backoff := minBackoff
 	attempts := 0
+	giveUp := time.After(thrashBudget)
 
 	for {
 		err := c.swapIn(ctx, id)
 		if !errors.Is(err, scheduler.ErrWouldThrash) {
+			if call != nil {
+				call.setBlocked(nil)
+			}
 			if attempts > 0 && err == nil {
 				c.Log.Info("swap succeeded after waiting out a residency window",
 					"model", id, "attempts", attempts+1)
@@ -245,14 +332,19 @@ func (c *Controller) swapInWithRetry(ctx context.Context, id scheduler.ModelID) 
 			return err
 		}
 		attempts++
+		if call != nil {
+			call.setBlocked(err)
+		}
 
 		select {
 		case <-ctx.Done():
-			// Report the thrash condition, not the context error: "every candidate
-			// was inside its residency window for the whole queue timeout" is
-			// actionable, "deadline exceeded" is not.
-			return fmt.Errorf("model %q could not be admitted within the deadline: %w",
-				id, scheduler.ErrWouldThrash)
+			return fmt.Errorf("model %q could not be admitted: %w", id, scheduler.ErrWouldThrash)
+		case <-giveUp:
+			// Report the thrash condition, not a context error: "every candidate was
+			// inside its residency window for the whole budget" is actionable,
+			// "deadline exceeded" is not.
+			return fmt.Errorf("model %q could not be admitted within %s: %w",
+				id, thrashBudget, scheduler.ErrWouldThrash)
 		case <-time.After(backoff):
 		}
 		if backoff < maxBackoff {
@@ -293,6 +385,21 @@ func (c *Controller) swapIn(ctx context.Context, id scheduler.ModelID) error {
 	}
 	metrics.ResidencyMisses.WithLabelValues(string(id), scheduler.TierOf(target.State).String()).Inc()
 
+	// One line per swap decision, with the budget the controller believes it has.
+	// Without this, a benchmark that reports zero evictions on an oversubscribed
+	// fleet is unexplainable after the fact: there is no way to tell whether the
+	// scheduler declined to evict or never saw a reason to.
+	c.Log.Info("planning swap",
+		"target", id, "target_state", target.State.String(),
+		"target_bytes", target.VRAMBytes,
+		"vram_used", cs.VRAMUsed(), "vram_free", cs.VRAMFree(),
+		"budget", cs.GPU.Budget(), "need", cs.Need(id),
+		"resident", residentIDs(cs), "evictable", len(cs.EvictableSet(id)),
+		// Why each resident model could not be evicted. "Nothing was evictable" is a
+		// useless benchmark artefact; "everything was inside its residency window" or
+		// "a drain is still in progress" is a diagnosis.
+		"blockers", cs.Blockers(id))
+
 	plan, err := scheduler.NewPlanner(c.Policy).Plan(cs, id)
 	if err != nil {
 		if errors.Is(err, scheduler.ErrWouldThrash) {
@@ -313,6 +420,18 @@ func (c *Controller) swapIn(ctx context.Context, id scheduler.ModelID) error {
 		"estimated", plan.EstimatedCost)
 
 	return c.execute(ctx, cs, plan)
+}
+
+// residentIDs lists the models the controller believes are holding VRAM, for the
+// swap decision log.
+func residentIDs(cs *scheduler.ClusterState) []string {
+	var out []string
+	for _, id := range cs.SortedIDs() {
+		if m := cs.Models[id]; m.State.HoldsVRAM() {
+			out = append(out, fmt.Sprintf("%s=%s", id, m.State))
+		}
+	}
+	return out
 }
 
 // execute runs a plan's steps in order.

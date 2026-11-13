@@ -39,6 +39,9 @@ import requests
 REPO = pathlib.Path(__file__).resolve().parent.parent
 RESULTS = REPO / "docs" / "results"
 TRACES = REPO / "bench" / "traces"
+# Not /tmp: WSL clears it when the distro restarts on its idle timeout, and a lost
+# gateway log makes a surprising benchmark result impossible to explain afterwards.
+LOGS = REPO / "docs" / "results" / "logs"
 
 
 # --------------------------------------------------------------------- plumbing
@@ -54,7 +57,8 @@ class Service:
 
     def __init__(self, name: str, cmd: list[str], env: dict | None = None) -> None:
         self.name = name
-        self.log = pathlib.Path("/tmp") / f"kiln-bench-{name}.log"
+        LOGS.mkdir(parents=True, exist_ok=True)
+        self.log = LOGS / f"{name}.log"
         self.fh = self.log.open("a")
         self.p = subprocess.Popen(cmd, stdout=self.fh, stderr=self.fh,
                                   env={**os.environ, **(env or {})}, start_new_session=True)
@@ -140,6 +144,32 @@ def counter_total(metrics: dict[str, float], prefix: str) -> float:
     return sum(v for k, v in metrics.items() if k.startswith(prefix))
 
 
+def trace_models(trace: pathlib.Path) -> list[str]:
+    """Model ids a trace addresses, from its metadata header."""
+    with trace.open(encoding="utf-8") as fh:
+        first = json.loads(fh.readline())
+    return list((first.get("_meta") or {}).get("models") or [])
+
+
+def check_trace_matches_fleet(trace: pathlib.Path, deployed: list[str]) -> None:
+    """Abort if a trace addresses models the experiment did not deploy.
+
+    This is the failure that looks like a result. A trace generated for five models
+    replayed against a fleet of three sends nearly half its requests at models that
+    do not exist: they fail instantly, never trigger a swap, and drag the measured
+    latency *down* while the eviction counters stay at zero. The run looks finished
+    and the numbers look plausible. Better to refuse.
+    """
+    missing = [m for m in trace_models(trace) if m not in deployed]
+    if missing:
+        raise SystemExit(
+            f"\ntrace {trace.name} addresses models that are not deployed: {missing}\n"
+            f"deployed: {deployed}\n"
+            "regenerate the traces for this fleet:\n"
+            f"  python bench/tracegen.py --models {','.join(deployed)}\n"
+        )
+
+
 def run_locust(gateway: str, trace: pathlib.Path, out_csv: pathlib.Path,
                users: int, api_key: str, duration: str) -> list[dict]:
     """Replay a trace through the gateway and return the per-request rows."""
@@ -212,7 +242,8 @@ class Bench:
         print(f"  node agent  :{self.agent_port}")
         agent = Service("agent", [
             str(REPO / "bin" / "nodeagent"), "-addr", f"127.0.0.1:{self.agent_port}",
-            "-python", sys.executable, "-node", "bench", "-log-dir", "/tmp/kiln-logs",
+            "-python", sys.executable, "-node", "bench",
+            "-log-dir", str(LOGS / "vllm"),
         ])
         agent.wait(f"http://127.0.0.1:{self.agent_port}/health", 30)
         self.services.append(agent)
@@ -380,6 +411,10 @@ def experiment_3(b: Bench) -> None:
             b.sleep_model(model_id, level=2)
             print(f"      slept {model_id}; GPU free: {b.gpu_free_mib()} MiB")
 
+        deployed = [m for m, _, _ in b.args.model_set]
+        for trace in traces:
+            check_trace_matches_fleet(trace, deployed)
+
         budget_mib = round((b.args.gpu_bytes - b.args.gpu_reserve_bytes) / 2**20)
         print(f"\n  fleet wants {total_mib} MiB, budget is {budget_mib} MiB "
               f"({'OVERSUBSCRIBED -- good' if total_mib > budget_mib else 'FITS -- no pressure, results will be uninformative'})")
@@ -446,6 +481,7 @@ def experiment_5(b: Bench) -> None:
     rows = []
     try:
         model_id, repo, util = b.args.model_set[0]
+        check_trace_matches_fleet(trace, [model_id])
         b.deploy(model_id, repo, replicas=b.args.replicas, gpu_util=util)
 
         for router in b.args.routers.split(","):

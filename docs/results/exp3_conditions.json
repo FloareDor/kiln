@@ -1,9 +1,9 @@
 {
   "experiment": 3,
-  "when": "2026-11-13 06:47:57",
-  "duration": "90s",
-  "users": 4,
-  "policies": "lru,cost-aware",
+  "when": "2026-11-13 07:32:36",
+  "duration": "2m",
+  "users": 6,
+  "policies": "lru",
   "routers": "round-robin,least-loaded,prefix-aware,prefix-aware+load",
   "traces": "zipf_s10",
   "models": [

@@ -680,6 +680,36 @@ func TestColdPolicyStopsRatherThanSleeps(t *testing.T) {
 	}
 }
 
+func TestACancelledRequestDoesNotAbortTheSwap(t *testing.T) {
+	// A swap is shared work with real GPU side effects: fifty requests coalesce onto
+	// one wake. If the triggering request's cancellation killed it, one client timing
+	// out would abort the wake, fail everyone waiting, and leave the model neither
+	// asleep nor resident. A whole benchmark run's worth of swaps was lost to this.
+	h := newHarness(t, 8, 400*time.Millisecond, scheduler.NewLRU(), model("a", 3))
+	setState(h.ctrl, "a", scheduler.StateSleepingL1)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Millisecond)
+	defer cancel()
+
+	// The caller gives up long before the wake can finish.
+	if err := h.ctrl.Ensure(ctx, "a"); err == nil {
+		t.Fatal("expected the caller to stop waiting")
+	}
+
+	// The wake must nonetheless complete, because the next request wants it.
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if h.ctrl.States()["a"] == "ACTIVE" {
+			if h.agent.count("wake:") != 1 {
+				t.Fatalf("expected exactly one wake, got %v", h.agent.opLog())
+			}
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("the swap was aborted when its caller gave up; state is %s", h.ctrl.States()["a"])
+}
+
 func TestEnsureRespectsContextCancellation(t *testing.T) {
 	// A client that gives up must not leave its request blocked forever behind a
 	// swap it no longer cares about.

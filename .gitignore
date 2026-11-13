@@ -8,3 +8,4 @@ docs/results/raw/*.jsonl
 node_modules/
 .DS_Store
 hf-cache/
+docs/results/logs/
