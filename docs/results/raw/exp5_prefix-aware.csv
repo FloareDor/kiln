@@ -1,1 +1,5 @@
 t_wall,model,team,status,ttft_ms,total_ms,prompt_tokens,completion_tokens,replica,session,turn
+184.8709,q05a,team-a,504,0.00,180013.08,0,0,,agent-0,0
+189.3979,q05a,team-a,504,0.00,180005.24,0,0,,agent-0,1
+189.4779,q05a,team-b,504,0.00,180005.00,0,0,,agent-19,0
+191.1325,q05a,team-a,504,0.00,180009.97,0,0,,agent-0,2
