@@ -212,8 +212,53 @@ func (c *Controller) Ensure(ctx context.Context, model string) error {
 		close(call.done)
 	}()
 
-	call.err = c.swapIn(ctx, id)
+	call.err = c.swapInWithRetry(ctx, id)
 	return call.err
+}
+
+// swapInWithRetry retries while the only obstacle is the anti-thrash guard.
+//
+// ErrWouldThrash means enough VRAM exists in principle but every candidate is inside
+// its minimum-residency window -- a condition that resolves on its own as those
+// windows expire. Returning it to the client would turn a momentarily contended GPU
+// into a 503, which is precisely the behaviour the guard exists to avoid; the point
+// of distinguishing it from ErrCannotFit is that one is worth waiting out and the
+// other is not.
+//
+// The wait is bounded by the caller's context, which the gateway sets from its queue
+// timeout, so a request still fails eventually rather than hanging forever.
+func (c *Controller) swapInWithRetry(ctx context.Context, id scheduler.ModelID) error {
+	const (
+		minBackoff = 150 * time.Millisecond
+		maxBackoff = 2 * time.Second
+	)
+	backoff := minBackoff
+	attempts := 0
+
+	for {
+		err := c.swapIn(ctx, id)
+		if !errors.Is(err, scheduler.ErrWouldThrash) {
+			if attempts > 0 && err == nil {
+				c.Log.Info("swap succeeded after waiting out a residency window",
+					"model", id, "attempts", attempts+1)
+			}
+			return err
+		}
+		attempts++
+
+		select {
+		case <-ctx.Done():
+			// Report the thrash condition, not the context error: "every candidate
+			// was inside its residency window for the whole queue timeout" is
+			// actionable, "deadline exceeded" is not.
+			return fmt.Errorf("model %q could not be admitted within the deadline: %w",
+				id, scheduler.ErrWouldThrash)
+		case <-time.After(backoff):
+		}
+		if backoff < maxBackoff {
+			backoff *= 2
+		}
+	}
 }
 
 func (c *Controller) isActive(id scheduler.ModelID) bool {

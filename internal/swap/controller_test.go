@@ -470,20 +470,89 @@ func TestDrainingModelIsImmediatelyUnroutable(t *testing.T) {
 
 // --------------------------------------------------------------- anti-thrash
 
-func TestMinResidencyIsReportedAsThrashNotFailure(t *testing.T) {
-	// Distinguishing "wait and retry" from "impossible" is the most useful thing the
-	// anti-thrash guard produces: one is a slightly slow request, the other a 503.
+func TestNothingIsEvictedInsideItsResidencyWindow(t *testing.T) {
+	// The guard itself, observed one level down from Ensure: planning reports the
+	// condition rather than picking a victim. Ensure's job is to wait it out, which
+	// TestThrashBlockIsWaitedOutRatherThanFailed covers; here the question is only
+	// whether anything gets evicted too early.
 	h := newHarness(t, 8, 0, scheduler.NewLRU(), model("justwoke", 5), model("want", 5))
 	h.ctrl.Config.MinResidency = 10 * time.Second
 	setState(h.ctrl, "justwoke", scheduler.StateActive) // resident as of now
 	setState(h.ctrl, "want", scheduler.StateSleepingL1)
 
-	err := h.ctrl.Ensure(context.Background(), "want")
-	if !errors.Is(err, scheduler.ErrWouldThrash) {
+	if err := h.ctrl.swapIn(context.Background(), "want"); !errors.Is(err, scheduler.ErrWouldThrash) {
 		t.Fatalf("got %v, want ErrWouldThrash", err)
 	}
 	if h.agent.count("sleep:") != 0 {
 		t.Fatalf("something was evicted inside its residency window: %v", h.agent.opLog())
+	}
+}
+
+func TestThrashBlockIsWaitedOutRatherThanFailed(t *testing.T) {
+	// ErrWouldThrash means "wait and it will clear", so it must not reach the client.
+	// Returning it would turn a momentarily contended GPU into a 503 -- the exact
+	// outcome distinguishing it from ErrCannotFit exists to prevent.
+	h := newHarness(t, 8, 0, scheduler.NewLRU(), model("justwoke", 5), model("want", 5))
+	h.ctrl.Config.MinResidency = 400 * time.Millisecond
+	setState(h.ctrl, "justwoke", scheduler.StateActive)
+	setState(h.ctrl, "want", scheduler.StateSleepingL1)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	if err := h.ctrl.Ensure(ctx, "want"); err != nil {
+		t.Fatalf("expected the swap to succeed once the window expired: %v", err)
+	}
+	elapsed := time.Since(start)
+
+	if elapsed < 300*time.Millisecond {
+		t.Fatalf("succeeded in %s, before the residency window could expire", elapsed)
+	}
+	if h.agent.count("sleep:justwoke") != 1 {
+		t.Fatalf("victim was not evicted after the window expired: %v", h.agent.opLog())
+	}
+	if h.ctrl.States()["want"] != "ACTIVE" {
+		t.Fatalf("target is %s, want ACTIVE", h.ctrl.States()["want"])
+	}
+}
+
+func TestThrashBlockStillFailsAtTheDeadline(t *testing.T) {
+	// Waiting is bounded: a request must not hang forever behind a window that keeps
+	// being renewed, and the error must name the real cause.
+	h := newHarness(t, 8, 0, scheduler.NewLRU(), model("justwoke", 5), model("want", 5))
+	h.ctrl.Config.MinResidency = time.Hour
+	setState(h.ctrl, "justwoke", scheduler.StateActive)
+	setState(h.ctrl, "want", scheduler.StateSleepingL1)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Millisecond)
+	defer cancel()
+
+	err := h.ctrl.Ensure(ctx, "want")
+	if !errors.Is(err, scheduler.ErrWouldThrash) {
+		t.Fatalf("got %v, want an error wrapping ErrWouldThrash", err)
+	}
+}
+
+func TestCannotFitFailsImmediatelyWithoutWaiting(t *testing.T) {
+	// The other half of the distinction: waiting cannot help when everything is
+	// pinned, so the request must fail at once rather than burning the deadline.
+	pinned := model("critical", 5)
+	pinned.Pinned = true
+	h := newHarness(t, 8, 0, scheduler.NewLRU(), pinned, model("want", 5))
+	setState(h.ctrl, "critical", scheduler.StateActive)
+	setState(h.ctrl, "want", scheduler.StateSleepingL1)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	err := h.ctrl.Ensure(ctx, "want")
+	if !errors.Is(err, scheduler.ErrCannotFit) {
+		t.Fatalf("got %v, want ErrCannotFit", err)
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("took %s to report an impossible swap; it should fail fast", elapsed)
 	}
 }
 
