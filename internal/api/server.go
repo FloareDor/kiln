@@ -83,8 +83,12 @@ type Server struct {
 	// They are the gateway's own view, not the agent's: a router must react to load
 	// it created microseconds ago, long before any agent poll would reflect it.
 	inflight map[routing.ReplicaID]int
-	queued   map[string]int
-	ttft     map[routing.ReplicaID]float64
+	// inflightModel is the same count aggregated per model. The swap controller
+	// drains a model, not a replica, and summing replicas on every drain poll would
+	// mean walking the whole fleet every 25ms during an eviction.
+	inflightModel map[string]int
+	queued        map[string]int
+	ttft          map[routing.ReplicaID]float64
 }
 
 // NewServer builds a gateway.
@@ -94,9 +98,10 @@ func NewServer(reg Registry, router routing.Router, cfg Config, log *slog.Logger
 	}
 	return &Server{
 		Reg: reg, Router: router, Proxy: NewProxy(log), Cfg: cfg, Log: log, Obs: obs,
-		inflight: map[routing.ReplicaID]int{},
-		queued:   map[string]int{},
-		ttft:     map[routing.ReplicaID]float64{},
+		inflight:      map[routing.ReplicaID]int{},
+		inflightModel: map[string]int{},
+		queued:        map[string]int{},
+		ttft:          map[routing.ReplicaID]float64{},
 	}
 }
 
@@ -242,8 +247,8 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, body []byte, mode
 		}
 	}
 
-	s.enter(replicaID)
-	defer s.leave(replicaID)
+	s.enter(replicaID, model)
+	defer s.leave(replicaID, model)
 
 	res, err := s.Proxy.ServeProxied(w, r.WithContext(ctx), up, path, body, stream)
 	if err != nil {
@@ -300,16 +305,20 @@ func (s *Server) pick(model, prompt string) (Upstream, routing.ReplicaID, error)
 	return Upstream{ReplicaID: id, BaseURL: rp.BaseURL}, id, nil
 }
 
-func (s *Server) enter(id routing.ReplicaID) {
+func (s *Server) enter(id routing.ReplicaID, model string) {
 	s.mu.Lock()
 	s.inflight[id]++
+	s.inflightModel[model]++
 	s.mu.Unlock()
 }
 
-func (s *Server) leave(id routing.ReplicaID) {
+func (s *Server) leave(id routing.ReplicaID, model string) {
 	s.mu.Lock()
 	if s.inflight[id] > 0 {
 		s.inflight[id]--
+	}
+	if s.inflightModel[model] > 0 {
+		s.inflightModel[model]--
 	}
 	s.mu.Unlock()
 }
@@ -335,6 +344,14 @@ func (s *Server) InFlight(id routing.ReplicaID) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.inflight[id]
+}
+
+// InFlightForModel is the swap controller's drain signal: a model is safe to sleep
+// only once this reaches zero.
+func (s *Server) InFlightForModel(model string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.inflightModel[model]
 }
 
 // QueueDepth exposes a model's current queue depth for metrics and the scheduler.
