@@ -16,24 +16,39 @@ Last updated: 2026-11-13
 ## Milestones
 | # | Milestone | State |
 |---|---|---|
-| M0 | Sanity check: vLLM sleep/wake frees + restores VRAM | in progress |
-| M1 | Gateway + node agent, one model, streaming | todo |
-| M2 | Postgres, auth, quotas, deploy jobs | todo |
+| M0 | Sanity check: vLLM sleep/wake frees + restores VRAM | done |
+| M1 | Gateway + node agent, one model, streaming | done |
+| M2 | Postgres, auth, quotas, deploy jobs | in progress |
 | M3 | Multiple replicas + Kubernetes | todo |
 | M4 | Observability + load testing | todo |
-| M5 | Model swapping (the main feature) | todo |
+| M5 | Model swapping (the main feature) | policy core done; executor todo |
 | M6 | Prefix-aware routing | todo |
 | M7 | Modal scale run + README polish | todo |
 
 ## Done
-Nothing landed yet. Repo skeleton, git, `.gitignore`, plan and progress files exist.
+**M0 - sleep mode verified.** vLLM 0.32.0 pinned. Sleep L1 and L2 each return 92% of a
+model's resident VRAM; wakes cost 0.88 s and 1.87 s against a 34.3 s warm-cache cold
+start (39x and 18x). Two findings recorded in `docs/PROGRESS.md`: level-2 wake is
+silently broken without a `collective_rpc{"method":"reload_weights"}` and produces
+garbage four times *faster* than the correct path, and NVML per-process accounting is
+unavailable under WSL2 so the first version of the gate passed having measured nothing.
+
+**M1 - gateway + node agent.** The stock OpenAI Python SDK streams from the platform.
+Cold start 42.9 s, streaming TTFT 0.071 s against a 1.107 s total, sleep/wake through
+the agent at 1.27 s / 0.59 s with byte-identical greedy output afterwards.
+
+**Scheduler core (M5 logic, built early).** `internal/scheduler`: state machine, VRAM
+and host-RAM accounting, EWMA demand tracker, all five eviction policies behind one
+shared fitting loop. Pure, no I/O, 29 tests, no GPU.
+
+**Routing core (M6 logic, built early).** `internal/routing`: all four routers and
+cumulative prefix block hashing. Pure, 18 tests.
 
 ## Next up
-**M0 — sanity check.** Set up a vLLM venv inside WSL2, pin the version, and run
-`scripts/verify_sleep_mode.py`: load a small model, measure cold start, call
-`sleep(level=1)` / `sleep(level=2)` / `wake_up()`, and record VRAM before/after each
-transition via NVML. The whole swapping feature is dead if sleep does not actually free
-VRAM on the pinned version, so this gate comes before any scheduler code.
+**M2 - Postgres, auth, quotas, deploy jobs.** The schema and the quota limiter are
+written and tested. What remains: the pgx store, the job worker using
+`FOR UPDATE SKIP LOCKED` plus leases, the admin deployment API, and an end-to-end
+proving a job survives a worker crash.
 
 ## Decisions
 - **Dev environment is WSL2 Ubuntu, not native Windows.** vLLM has no Windows build.
@@ -50,7 +65,9 @@ VRAM on the pinned version, so this gate comes before any scheduler code.
   offline with no GPU.
 
 ## Open questions
-- Which exact vLLM version pins cleanly with working sleep mode on CUDA 12.x? Resolved
-  by M0; record the version and the measured VRAM deltas here.
-- Does sleep L1 on a 3070 Laptop (8GB, shared with the desktop compositor) free enough
-  VRAM to be worth it, or is only L2 useful at this size? Decide after M0 numbers.
+- Both tiers earn their place (L1 wakes about 2x faster than L2 but costs pinned host
+  RAM), so `ChooseTier` has a real decision to make. Settled by M0.
+- How many 0.5B-class models actually fit active on 8 GB at once? Needed to size the
+  capacity experiment; measure during M3 when multiple replicas land.
+- Modal GPU choice for the headline runs (A10G vs L4 vs A100) and which 7-8B model.
+  Decide at M7; the benchmark scripts already target local or Modal via config.

@@ -1,0 +1,48 @@
+{
+  "model": "qwen-0.5b",
+  "hf_repo": "Qwen/Qwen2.5-0.5B-Instruct",
+  "checks": {
+    "models_listed": true,
+    "nonstreaming_text": true,
+    "nonstreaming_usage": true,
+    "streamed_incrementally": true,
+    "correct_after_wake": true
+  },
+  "cold_start_s": 42.95,
+  "replica": {
+    "spec": {
+      "replica": "qwen-0.5b--0",
+      "model": "qwen-0.5b",
+      "hf_repo": "Qwen/Qwen2.5-0.5B-Instruct",
+      "gpu_memory_utilization": 0.35,
+      "max_model_len": 2048,
+      "enforce_eager": true,
+      "disable_prefix_caching": false
+    },
+    "state": "ACTIVE",
+    "port": 19000,
+    "pid": 676,
+    "base_url": "http://127.0.0.1:19000",
+    "restarts": 0,
+    "cold_start_ms": 42938,
+    "last_transition": "2026-11-13T04:25:56.125664984-05:00"
+  },
+  "nonstreaming": {
+    "latency_s": 1.164,
+    "text": "Three primary colors are red, blue, and yellow. These colors are fundamental in the visual spectrum and are used to create various hues and shades of light and color.",
+    "prompt_tokens": 34,
+    "completion_tokens": 34
+  },
+  "streaming": {
+    "ttft_s": 0.071,
+    "total_s": 1.107,
+    "chunks": 37,
+    "text": "Sure! Here's the count from one to twelve:\n\n1 2 3 4 5 6 7 8 9 10 11 12"
+  },
+  "sleep_wake": {
+    "sleep_l1_s": 1.271,
+    "wake_l1_s": 0.587,
+    "text_after_wake": "Three primary colors are red, blue, and yellow. These colors are fundamental in the visual spectrum and are used to create various hues and shades of light and color."
+  },
+  "PASS": true
+}

@@ -103,7 +103,67 @@ zero. The node agent inherits the same fallback.
 
 ---
 
-## M5 (partial) — scheduler core
+## M1 - gateway + node agent, one model, streaming
+
+**Status: done. All acceptance checks pass on the local RTX 3070.**
+
+Done when the stock OpenAI Python SDK streams from the platform with no Kiln-specific
+client code. `scripts/e2e_m1.py` brings up a node agent and a gateway, deploys a model
+through the agent's API, then drives everything through `openai.OpenAI(base_url=...)`.
+
+### Results
+
+| check | result |
+|---|---|
+| cold start to ACTIVE (Qwen2.5-0.5B, eager) | **42.9 s** |
+| `GET /v1/models` lists the model and its tier state | PASS |
+| non-streaming chat completion returns text + usage | **1.16 s**, 34 tokens |
+| streaming: TTFT vs total | **0.071 s vs 1.107 s**, 37 chunks |
+| sleep L1 then wake through the agent | 1.27 s / **0.59 s** |
+| greedy output identical after the wake | PASS |
+
+The TTFT number is the one that matters structurally. At 0.071 s against a 1.107 s
+total, the gateway is demonstrably forwarding SSE frames as they arrive rather than
+buffering the response. If it buffered, TTFT would equal total and **every latency
+number this project goes on to report would be an artefact of the gateway rather than
+a property of the model**. The test asserts `ttft < 0.8 x total`, so a future change
+that reintroduces buffering fails rather than silently inflating the results.
+
+### Finding: replica ids go into URL paths, so they must be URL-safe
+
+The first run failed at the sleep step with a 405. The replica id was `qwen-0.5b#0`,
+and `#` begins a URL fragment, so `POST /replicas/qwen-0.5b#0/sleep` was delivered to
+the server as `POST /replicas/qwen-0.5b` - a path with no handler. The fix is both
+halves: the naming convention now uses `--` as the separator, and `agentclient`
+`url.PathEscape`s every id it puts in a path, because an id is caller-supplied data
+and an unescaped `/` would retarget the request entirely.
+
+### Design decisions
+
+- **The gateway polls node agents rather than being pushed to.** A serving platform
+  whose data path depends on its control path has outages its users cannot explain.
+  Polling also makes recovery after a partition automatic. One unreachable agent drops
+  only its own replicas from the fleet view and leaves every other agent serving.
+- **Only `ACTIVE` is routable.** `STARTING`, `WAKING`, `DRAINING`, `SLEEPING_*` and
+  `FAILED` all mean "no traffic", for different reasons the router need not
+  distinguish.
+- **`stream_options.include_usage` is injected into every streaming request.** vLLM
+  only emits a usage block when asked. Without it the gateway cannot count tokens for
+  streaming responses - which is most real traffic - and per-team quotas would
+  silently stop working on exactly the requests that matter.
+- **The node agent kills process groups, not processes.** vLLM runs its engine core in
+  a child; killing only the parent leaves that child holding the GPU, and the next
+  model fails to place against memory nothing appears to own.
+- **A replica is ACTIVE only once it has generated a token.** vLLM reports healthy
+  before the model is usable on some paths, and the level-2 wake bug from M0 produces
+  a replica that is healthy and wrong.
+- **Ensure runs before routing.** It is the hook the swap scheduler takes over in M5;
+  routing first would mean a request for a sleeping model 503s instead of waiting for
+  a wake, making tiering unreachable from the request path.
+
+---
+
+## M5 (partial) - scheduler core
 
 Built early because it is pure logic that needs no GPU, so it could proceed while
 model downloads and installs were running.
