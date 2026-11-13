@@ -1,26 +1,31 @@
 {
   "experiment": 3,
-  "when": "2026-11-13 08:22:23",
-  "duration": "2m",
-  "users": 6,
-  "policies": "lru,cold",
+  "when": "2026-11-13 08:32:30",
+  "duration": "3m",
+  "users": 3,
+  "policies": "lru,cost-aware",
   "routers": "round-robin,least-loaded,prefix-aware,prefix-aware+load",
   "traces": "zipf_s10",
   "models": [
     [
-      "qwen-0.5b",
+      "q05a",
       "Qwen/Qwen2.5-0.5B-Instruct",
-      0.3
+      0.22
     ],
     [
-      "qwen3-0.6b",
+      "q06",
       "Qwen/Qwen3-0.6B",
-      0.32
+      0.24
     ],
     [
-      "qwen-1.5b",
+      "q05b",
+      "Qwen/Qwen2.5-0.5B-Instruct",
+      0.22
+    ],
+    [
+      "q15",
       "Qwen/Qwen2.5-1.5B-Instruct",
-      0.55
+      0.5
     ]
   ],
   "gpu_bytes": 8589934592,

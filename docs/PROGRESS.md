@@ -413,6 +413,115 @@ stale.
 
 ---
 
+## M5 - model swapping: what the benchmark found
+
+**Status: the mechanism works and is measured. Policy comparison running.**
+
+Experiment 2's numbers are above. This section is about what running the policy
+comparison exposed, because the benchmark turned out to be a better test of the
+swapping code than the unit tests were.
+
+The pattern repeated four times: a run finished, produced plausible-looking numbers,
+and was wrong. Each time the giveaway was a counter that should not have been zero.
+
+### 1. Swaps were cancelled by whoever triggered them
+
+The first full run reported **zero evictions on a fleet it had just confirmed was
+oversubscribed**. A swap decision log, added to find out why, showed:
+
+```
+swap step failed  step=wake q06  err=... context canceled
+```
+
+The swap ran on the triggering HTTP request's context. But a swap is *shared* work
+with real GPU side effects - fifty requests coalesce onto one wake - so binding it to
+one client's lifecycle meant that client timing out aborted the wake part-way, failed
+everyone waiting on it, and left the model neither asleep nor resident. A benchmark
+run merely *ending* cancelled every swap in flight.
+
+Swaps now run on a context detached from the caller's. The caller only waits; giving
+up stops the wait, not the swap, and the model still becomes resident for whoever asks
+next. Same workload, LRU on `zipf_s10`:
+
+| | before | after |
+|---|---|---|
+| p95 TTFT | 9.66 s | **3.62 s** |
+| p99 TTFT | 9.66 s | **4.13 s** |
+| residency hit ratio | 0.42 | **0.78** |
+| thrash events | 10 | **0** |
+
+### 2. ErrWouldThrash reached the client as a 503
+
+`ErrWouldThrash` means enough VRAM exists but every candidate is inside its
+minimum-residency window - a condition that clears on its own. `DESIGN.md` said the
+gateway queues such a request. The controller returned the error straight through.
+That turns a momentarily contended GPU into an outage and makes the whole
+`ErrWouldThrash` / `ErrCannotFit` distinction pointless. `Ensure` now retries with
+backoff, bounded by the caller's deadline, and reports *what is blocking it* rather
+than a bare timeout.
+
+### 3. The cold baseline could stop a model but never restart it
+
+The ten-arm run logged **7004 failed swap steps out of 7009**:
+
+```
+start q05a  err=... 500: nodeagent: unknown replica
+```
+
+The `cold` policy evicts by stopping a victim's process outright - that is what makes
+it the no-tiering baseline - and the agent forgets a stopped replica entirely. The
+controller's cold-start path then asked the agent to *wake* a replica that no longer
+existed. The model became permanently unreachable, and because every arm shares one
+agent, the first cold-policy eviction poisoned all nine arms after it.
+
+A cold start now rebuilds the vLLM spec from the registry and starts a fresh process,
+using the deployment's own spec so a restarted replica is configured identically to
+the one that was stopped.
+
+**The fake agent in the unit tests was hiding this.** It accepted a wake for any
+replica, including ones it had been told to stop, so the suite stayed green while the
+real agent returned 500. The fake now forgets stopped replicas and rejects unknown
+ones - which is the general lesson: a fake that is more permissive than the real thing
+does not test the interesting cases, it conceals them.
+
+### 4. Minimum residency was mis-calibrated, and that is a real constraint
+
+At 15 s, with a trace at 2 req/s across three models, every model was almost always
+"freshly resident". Nothing was ever evictable, and the scheduler stopped making
+progress: 52 thrash events and zero evictions in two minutes.
+
+The window is bounded **below by the wake cost** (it exists so an eviction's cost is
+not immediately wasted) and **above by the inter-request interval for one model** (set
+longer, and nothing is ever evictable). A fleet where those two bounds cross has no
+workable setting. At 5 s the same workload performed 3 evictions and 6 wakes with no
+failed steps.
+
+### 5. The traces did not match the fleet
+
+Generated for five models, replayed against three. Nearly half of every trace addressed
+models that did not exist: those requests failed instantly, never triggered a swap, and
+dragged measured latency *down* while the eviction counters stayed at zero. A run that
+looks finished, with plausible numbers, measuring nothing. `tracegen` now takes the
+fleet and the runner refuses to start when a trace addresses models that are not
+deployed.
+
+### Fleet calibration for an 8 GB card
+
+Three models totalling 9.6 GB against a 7.2 GB usable budget saturates the device -
+p95 reached 80 s, which measures the hardware rather than the policy. The benchmark
+fleet is now four models of **mixed** size (1.8 GB, 1.9 GB, 1.8 GB, 4.1 GB = 9.7 GB)
+at a lower request rate, so two or three are resident and eviction is frequent without
+being pathological.
+
+Mixed sizes are deliberate: a uniform fleet would make `cost-aware`'s per-GB
+normalisation indistinguishable from `lfu-decay`, so the experiment could not show the
+thing it exists to show.
+
+Healthy run, for reference: p50 78 ms, p95 3.7 s, 9 evictions, **0 thrash events, 0
+failed swap steps**.
+
+---
+
 ## Appendix - scheduler core (built early)
 
 Built early because it is pure logic that needs no GPU, so it could proceed while

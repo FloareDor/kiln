@@ -4,5 +4,5 @@ Every arm replays the identical recorded trace, so the only variable is the evic
 
 | arm | requests | ok | errors | ttft_p50_ms | ttft_p95_ms | ttft_p99_ms | total_p50_ms | total_p95_ms | completion_tokens | tokens_per_s | requests_per_s | trace | policy | evictions | wakes | cold_starts | thrash | drain_timeouts | residency_hit_ratio | fleet_mib | budget_mib |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| zipf_s10/lru | 14 | 14 | 0 | 2281.2 | 80382.2 | 80653.2 | 24630.6 | 85741.2 | 856 | 10.0 | 0.16 | zipf_s10 | lru | 3 | 4 | 1 | 13 | 2 | 0.273 | 9585 | 7168 |
-| zipf_s10/cold | 22 | 22 | 0 | 1051.8 | 80423.0 | 83377.4 | 28338.2 | 82374.0 | 1105 | 9.4 | 0.19 | zipf_s10 | cold | 3 | 2 | 3 | 19 | 2 | 0.289 | 9585 | 7168 |
+| zipf_s10/lru | 304 | 38 | 266 | 78.1 | 3706.9 | 8575.8 | 2185.1 | 8904.5 | 2256 | 12.6 | 0.21 | zipf_s10 | lru | 9 | 11 | 0 | 0 | 0 | 0.609 | 9666 | 7168 |
+| zipf_s10/cost-aware | 300 | 40 | 260 | 82.9 | 4348.5 | 6838.8 | 2217.3 | 8721.3 | 2384 | 13.3 | 0.22 | zipf_s10 | cost-aware | 11 | 13 | 0 | 0 | 0 | 0.583 | 9666 | 7168 |

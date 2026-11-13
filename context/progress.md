@@ -21,7 +21,7 @@ Last updated: 2026-11-13
 | M2 | Postgres, auth, quotas, deploy jobs | done |
 | M3 | Multiple replicas + Kubernetes | stack deployed + healthy; GPU blocked by WSL2 |
 | M4 | Observability + load testing | metrics + harness done; runs pending |
-| M5 | Model swapping (the main feature) | code done + 21 tests; experiments pending |
+| M5 | Model swapping (the main feature) | working + measured; policy table running |
 | M6 | Prefix-aware routing | routers done + 18 tests; experiment pending |
 | M7 | Modal scale run + README polish | README + diagrams done; Modal pending |
 
@@ -53,14 +53,13 @@ replacement: DONE after 2 attempts. Three real bugs found and fixed, written up 
 `docs/PROGRESS.md`.
 
 ## Next up
-**Experiments, then Modal.** All the code is written and tested; what remains is
-running it and filling in the two results tables the README leaves open.
+**Finish the results tables, then Modal.** The swapping mechanism works and is
+measured; five bugs found by running it are written up in `docs/PROGRESS.md`.
 
-1. `make bench EXP=2` - sleep vs cold per model size.
-2. `make bench EXP=3` - the five eviction policies across Zipf and bursty traces.
-3. `make bench EXP=5` - the four routers on agent traffic.
-4. Modal run with a 7-8B model for the headline numbers, then a Grafana screenshot
-   and a demo GIF for the README.
+1. Experiment 3 (five policies x two traces) - running.
+2. Experiment 5 (four routers on agent traffic).
+3. Experiment 1 (replica sweep) if the GPU budget allows two replicas.
+4. Modal run with a 7-8B model, Grafana screenshot, demo GIF, README numbers.
 
 ## Decisions
 - **Dev environment is WSL2 Ubuntu, not native Windows.** vLLM has no Windows build.
