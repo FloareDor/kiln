@@ -196,10 +196,18 @@ def run_locust(gateway: str, trace: pathlib.Path, out_csv: pathlib.Path,
         cmd += ["--api-key", api_key]
     if max_tokens:
         cmd += ["--max-tokens", str(max_tokens)]
-    subprocess.run(cmd, check=False, capture_output=True, text=True)
+    proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
 
-    if not out_csv.exists():
-        return []
+    # Never swallow a load generator's failure. check=False with captured output
+    # meant a Locust that refused to start looked exactly like a run that produced
+    # no traffic, and the arm silently recorded zero requests.
+    if proc.returncode != 0 or not out_csv.exists() or out_csv.stat().st_size == 0:
+        tail = (proc.stderr or proc.stdout or "").strip().splitlines()[-12:]
+        detail = "\n  ".join(tail)
+        raise RuntimeError(
+            "locust produced no results (exit %d)\n  %s\ncommand: %s"
+            % (proc.returncode, detail, " ".join(cmd)))
+
     with out_csv.open(encoding="utf-8") as fh:
         return list(csv.DictReader(fh))
 

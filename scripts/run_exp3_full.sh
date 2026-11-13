@@ -22,6 +22,6 @@
 set -euo pipefail
 exec bash "$(dirname "$0")/run_bench.sh" 3 \
   --traces zipf_s10,bursty \
-  --duration 4m --users 6 \
+  --duration 5m \
   --models "q05a:Qwen/Qwen2.5-0.5B-Instruct:0.22,q06:Qwen/Qwen3-0.6B:0.32,q05b:Qwen/Qwen2.5-0.5B-Instruct:0.22,q05c:Qwen/Qwen2.5-0.5B-Instruct:0.26" \
   "$@"

@@ -79,12 +79,17 @@ def on_start(environment, **_):
     if opts.results:
         p = pathlib.Path(opts.results)
         p.parent.mkdir(parents=True, exist_ok=True)
-        _results_file = p.open("w", encoding="utf-8")
+        # Line buffered, and flushed per row below. A run that is interrupted, or
+        # whose process is torn down before test_stop fires, otherwise loses every
+        # buffered row -- which looks identical to an arm that generated no traffic
+        # at all, and is far harder to diagnose.
+        _results_file = p.open("w", encoding="utf-8", buffering=1)
         # Per-request rows, not just Locust's aggregates. The experiments need
         # percentiles computed over a chosen window and grouped by model, which
         # aggregate-only output cannot give.
         _results_file.write("t_wall,model,team,status,ttft_ms,total_ms,"
                             "prompt_tokens,completion_tokens,replica,session,turn\n")
+        _results_file.flush()
 
 
 @events.test_stop.add_listener
@@ -103,6 +108,7 @@ def record(row: dict) -> None:
             f"{row['ttft_ms']:.2f},{row['total_ms']:.2f},"
             f"{row['prompt_tokens']},{row['completion_tokens']},"
             f"{row['replica']},{row['session']},{row['turn']}\n")
+        _results_file.flush()
 
 
 # ------------------------------------------------------------------ the request

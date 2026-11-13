@@ -1,2 +1,2 @@
 arm,requests,offered_rps,ok,errors,ttft_p50_ms,ttft_p95_ms,ttft_p99_ms,total_p50_ms,total_p95_ms,completion_tokens,tokens_per_s,requests_per_s,trace,policy,evictions,wakes,cold_starts,thrash,drain_timeouts,residency_hit_ratio,fleet_mib,budget_mib
-zipf_s10/lru,18,0.23,18,0,1376.5,53898.0,55196.7,12074.9,54520.2,288,3.7,0.23,zipf_s10,lru,4,7,0,16,0,0.108,8355,7168
+zipf_s10/lru,17,0.32,17,0,1075.5,26665.6,28379.5,7231.4,27616.1,272,5.1,0.32,zipf_s10,lru,4,7,0,20,1,0.101,8355,7168

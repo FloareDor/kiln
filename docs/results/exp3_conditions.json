@@ -1,7 +1,7 @@
 {
   "experiment": 3,
-  "when": "2026-11-13 10:21:09",
-  "duration": "3m",
+  "when": "2026-11-13 10:34:33",
+  "duration": "2m",
   "users": 4,
   "policies": "lru",
   "routers": "round-robin,least-loaded,prefix-aware,prefix-aware+load",
