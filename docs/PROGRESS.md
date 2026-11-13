@@ -266,7 +266,106 @@ can compile.
 
 ---
 
-## M5 (partial) - scheduler core
+## M3 - multiple replicas and Kubernetes
+
+**Status: stack deployed and healthy on a GPU-enabled cluster. Acceptance run in
+`scripts/e2e_m3.py`.**
+
+`make cluster` brings up minikube with `--gpus all` plus the NVIDIA device plugin, and
+`make up` builds the three images, streams them into the node and applies the
+manifests. Eight pods: two gateways, two control planes, one node-agent DaemonSet,
+Postgres, Prometheus and Grafana.
+
+### The architectural claim, checked rather than asserted
+
+The acceptance test enumerates every container's resource limits and asserts that
+**exactly one pod requests `nvidia.com/gpu`, and it is the node agent**. That is the
+whole design in one assertion: Kubernetes hands a pod a GPU for the pod's entire
+lifetime, so if anything else held one, that model would own its device forever and
+tiering would be unexpressible.
+
+### Two bugs found by deploying for real
+
+**The node agent crash-looped with `exec: "-addr": executable file not found`.** The
+Dockerfile cleared `ENTRYPOINT` so the agent could be PID 1 instead of the vLLM base
+image's own entrypoint. But a Kubernetes `args:` list *replaces* `CMD` and *appends to*
+`ENTRYPOINT`, so with an empty entrypoint the kubelet tried to execute `-addr` as a
+program. Fixed on both sides: `ENTRYPOINT ["/usr/local/bin/nodeagent"]` in the image,
+and an explicit `command:` in the manifest so the pod is immune to a surprise
+entrypoint in whatever base image it is rebuilt on.
+
+**`minikube image load` is unusable on Windows 11.** It shells out to `wmic` to
+translate a drive letter into a volume name, and `wmic` was removed from the OS.
+Images now stream straight into the node's daemon over SSH
+(`docker save | minikube ssh docker load`), which also avoids writing a 23 GB tarball
+to disk on the way.
+
+### Notes
+
+- The gateway and control plane restarted four or five times while Postgres was
+  initialising. That is the intended behaviour rather than a defect -- both exit when
+  the database is unreachable at startup, and the kubelet's restart *is* the retry
+  loop -- but it is worth knowing that a cold `make up` shows a handful of restarts
+  before settling.
+- The node agent gets `terminationGracePeriodSeconds: 180` and no liveness probe. A
+  cold start can block long enough to look dead to a prober, and restarting mid-load
+  orphans a vLLM process still holding the GPU, which the next pod then cannot place
+  against.
+- `/dev/shm` is mounted as an 8 GiB `emptyDir` with `medium: Memory`. vLLM's engine
+  core talks to its workers over shared memory, and Docker's default 64 MB produces a
+  bus error during startup that reads as an unrelated CUDA failure.
+
+---
+
+## M4 - observability and load testing
+
+**Status: metrics and dashboard done; experiment runs in progress.**
+
+Prometheus instrumentation covers the client view (TTFT, throughput, status classes,
+queue depth and wait, quota rejections), the device view (GPU and host memory, models
+by state), the tiering view (swap duration by transition, evictions, wakes, cold
+starts, residency hits and misses, thrash, drain timeouts) and the routing view
+(prefix hits and misses, blocks matched, in-flight per replica).
+
+Two instrumentation decisions worth recording:
+
+- **Latency buckets are hand-chosen, not `prometheus.DefBuckets`.** The default
+  buckets top out at 10 s. LLM serving spans four orders of magnitude -- a prefix-cache
+  hit answers in 50 ms, a cold start takes 40 s -- so every cold start would land in
+  `+Inf` and the p99, which is the number the whole swapping argument turns on, would
+  be unmeasurable.
+- **Status codes are bucketed into classes.** Raw codes would be fine today but are a
+  cardinality trap the moment an upstream starts returning a long tail of them.
+
+`bench/tracegen.py` writes six fixed traces (steady, Zipf at s = 0.6/1.0/1.4, bursty,
+agent) with fixed seeds. Every policy and router arm replays the identical sequence, so
+a difference in p95 is attributable to the arm rather than to the random draw.
+
+`bench/locustfile.py` replays at recorded arrival times rather than as a closed loop,
+because a closed loop's request rate is set by the model's own latency -- which is the
+variable under test. It measures TTFT on the first chunk carrying content, not the
+first SSE frame: vLLM emits a role-only delta first, and counting it would under-report
+TTFT by a whole decode step.
+
+---
+
+## M5 - model swapping
+
+**Status: executor and policies done and tested; experiments pending.**
+
+`internal/swap` turns the scheduler's pure decisions into sleep, wake and start calls
+against node agents. 21 tests, no GPU required. The properties they pin down are listed
+in the commit for `M5 core`, and the reasoning behind each is in `docs/DESIGN.md`.
+
+The controller lives in the gateway rather than the control plane. A model may only be
+slept once its in-flight requests reach zero, and the gateway is the only component
+that knows that count exactly and instantly; polling for it from the control plane
+would put a network round trip on the eviction path and return a number that is already
+stale.
+
+---
+
+## Appendix - scheduler core (built early)
 
 Built early because it is pure logic that needs no GPU, so it could proceed while
 model downloads and installs were running.

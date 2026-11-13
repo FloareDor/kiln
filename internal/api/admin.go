@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/google/uuid"
@@ -331,6 +332,20 @@ func adminErr(w http.ResponseWriter, code int, msg string) {
 	writeJSON(w, code, map[string]string{"error": msg})
 }
 
+// replicaURL rebuilds a replica's address from its owning agent's URL, keeping the
+// scheme and host but substituting the replica's own port.
+func replicaURL(agentURL string, port int) string {
+	u, err := url.Parse(agentURL)
+	if err != nil || u.Host == "" {
+		return fmt.Sprintf("http://127.0.0.1:%d", port)
+	}
+	host := u.Hostname()
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	return fmt.Sprintf("%s://%s:%d", u.Scheme, host, port)
+}
+
 func lastSegment(repo string) string {
 	for i := len(repo) - 1; i >= 0; i-- {
 		if repo[i] == '/' {
@@ -361,7 +376,10 @@ func (sr *StoreRegistry) Replicas(model string) []Replica {
 	for _, r := range reps {
 		out = append(out, Replica{
 			ID: replicaID(r.ID), Model: model,
-			BaseURL: fmt.Sprintf("http://127.0.0.1:%d", r.Port),
+			// Derive the host from the agent that owns the replica, never loopback:
+			// the gateway may be on another host entirely, and 127.0.0.1 would point
+			// it at itself.
+			BaseURL: replicaURL(r.AgentURL, r.Port),
 			State:   r.State, Ready: r.State == "ACTIVE",
 		})
 	}

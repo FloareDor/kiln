@@ -166,11 +166,21 @@ spec:
         - name: nodeagent
           image: kiln/nodeagent:dev
           imagePullPolicy: IfNotPresent
+          # Stated explicitly rather than relying on the image's ENTRYPOINT: the
+          # vLLM base image ships its own, and inheriting it silently would start
+          # vLLM instead of the supervisor.
+          command: ["/usr/local/bin/nodeagent"]
           args: ["-addr", ":8081", "-python", "python3", "-log-dir", "/var/log/kiln"]
           env:
             - name: KILN_NODE
               valueFrom:
                 fieldRef: { fieldPath: spec.nodeName }
+            # The gateway is a different pod, so replicas must be advertised at an
+            # address it can route to. Without this the agent reports 127.0.0.1 and
+            # the gateway quietly tries to reach vLLM on its own loopback.
+            - name: KILN_ADVERTISE_HOST
+              valueFrom:
+                fieldRef: { fieldPath: status.podIP }
             - name: HF_HOME
               value: /cache/huggingface
             # Gates vLLM's /sleep, /wake_up and /collective_rpc. Without it those

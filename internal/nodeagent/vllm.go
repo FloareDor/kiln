@@ -87,16 +87,23 @@ type Config struct {
 	HFHome string
 	// Env is extra environment for every child process.
 	Env []string
+
+	// AdvertiseHost is the host other components should use to reach this node's
+	// replicas. It defaults to 127.0.0.1, which is right for a single-host dev setup
+	// and wrong everywhere else: under Kubernetes the gateway is a different pod, so
+	// the agent must advertise its pod IP. Set from the downward API in the manifest.
+	AdvertiseHost string
 }
 
 // DefaultConfig returns workable defaults for local development.
 func DefaultConfig() Config {
 	return Config{
-		PythonBin:    "python",
-		PortBase:     19000,
-		LogDir:       "/tmp/kiln-logs",
-		StartTimeout: 15 * time.Minute,
-		HFHome:       os.Getenv("HF_HOME"),
+		PythonBin:     "python",
+		PortBase:      19000,
+		LogDir:        "/tmp/kiln-logs",
+		StartTimeout:  15 * time.Minute,
+		HFHome:        os.Getenv("HF_HOME"),
+		AdvertiseHost: "127.0.0.1",
 	}
 }
 
@@ -133,8 +140,22 @@ func newReplica(spec Spec, cfg Config, port int) *Replica {
 	}
 }
 
-// BaseURL is the vLLM OpenAI server this replica serves on.
-func (r *Replica) BaseURL() string { return fmt.Sprintf("http://127.0.0.1:%d", r.port) }
+// BaseURL is where other components should send requests for this replica.
+//
+// Built from AdvertiseHost rather than hard-coded to loopback: the gateway may be on
+// another host entirely, and an advertised 127.0.0.1 silently points it at itself.
+func (r *Replica) BaseURL() string {
+	host := r.cfg.AdvertiseHost
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	return fmt.Sprintf("http://%s:%d", host, r.port)
+}
+
+// localURL is the address the agent itself uses to drive vLLM. Always loopback: the
+// process is this agent's own child, so routing that traffic through the advertised
+// address would leave the node and come back for no reason.
+func (r *Replica) localURL() string { return fmt.Sprintf("http://127.0.0.1:%d", r.port) }
 
 // State returns the current lifecycle state.
 func (r *Replica) State() scheduler.State {
@@ -310,7 +331,7 @@ func (r *Replica) probe(ctx context.Context) error {
 	})
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, r.BaseURL()+"/v1/completions", bytes.NewReader(body))
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, r.localURL()+"/v1/completions", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := r.client.Do(req)
 	if err != nil {
@@ -345,7 +366,7 @@ func (r *Replica) Sleep(ctx context.Context, level int, mode string) error {
 	}
 	r.mu.Unlock()
 
-	u := fmt.Sprintf("%s/sleep?level=%d&mode=%s", r.BaseURL(), level, mode)
+	u := fmt.Sprintf("%s/sleep?level=%d&mode=%s", r.localURL(), level, mode)
 	if err := r.post(ctx, u, nil, 10*time.Minute); err != nil {
 		r.fail(err)
 		return err
@@ -381,14 +402,14 @@ func (r *Replica) Wake(ctx context.Context) error {
 	r.mu.Unlock()
 
 	start := time.Now()
-	if err := r.post(ctx, r.BaseURL()+"/wake_up", nil, 10*time.Minute); err != nil {
+	if err := r.post(ctx, r.localURL()+"/wake_up", nil, 10*time.Minute); err != nil {
 		r.fail(err)
 		return err
 	}
 
 	if from == scheduler.StateSleepingL2 {
 		body, _ := json.Marshal(map[string]any{"method": "reload_weights"})
-		if err := r.post(ctx, r.BaseURL()+"/collective_rpc", body, 15*time.Minute); err != nil {
+		if err := r.post(ctx, r.localURL()+"/collective_rpc", body, 15*time.Minute); err != nil {
 			r.fail(fmt.Errorf("reload_weights after level-2 wake: %w", err))
 			return err
 		}

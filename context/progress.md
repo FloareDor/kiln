@@ -19,11 +19,11 @@ Last updated: 2026-11-13
 | M0 | Sanity check: vLLM sleep/wake frees + restores VRAM | done |
 | M1 | Gateway + node agent, one model, streaming | done |
 | M2 | Postgres, auth, quotas, deploy jobs | done |
-| M3 | Multiple replicas + Kubernetes | in progress |
-| M4 | Observability + load testing | metrics done; Locust todo |
-| M5 | Model swapping (the main feature) | policy core done; executor todo |
-| M6 | Prefix-aware routing | todo |
-| M7 | Modal scale run + README polish | todo |
+| M3 | Multiple replicas + Kubernetes | stack deployed; acceptance running |
+| M4 | Observability + load testing | metrics + harness done; runs pending |
+| M5 | Model swapping (the main feature) | code done + 21 tests; experiments pending |
+| M6 | Prefix-aware routing | routers done + 18 tests; experiment pending |
+| M7 | Modal scale run + README polish | README + diagrams done; Modal pending |
 
 ## Done
 **M0 - sleep mode verified.** vLLM 0.32.0 pinned. Sleep L1 and L2 each return 92% of a
@@ -53,12 +53,14 @@ replacement: DONE after 2 attempts. Three real bugs found and fixed, written up 
 `docs/PROGRESS.md`.
 
 ## Next up
-**M3 - multiple replicas + Kubernetes.** Manifests, Dockerfiles and the Makefile are
-written (node agent as a DaemonSet owning the GPU; gateway and control plane as
-Deployments; Postgres as a StatefulSet; Prometheus + Grafana). What remains: bring up
-minikube with GPU passthrough, verify `make up`, and show requests spreading across
-replicas. Open risk: 8 GB is tight for two replicas even of a 0.5B model at
-`gpu_memory_utilization 0.35`, so the replica experiment may need `0.2` or Modal.
+**Experiments, then Modal.** All the code is written and tested; what remains is
+running it and filling in the two results tables the README leaves open.
+
+1. `make bench EXP=2` - sleep vs cold per model size.
+2. `make bench EXP=3` - the five eviction policies across Zipf and bursty traces.
+3. `make bench EXP=5` - the four routers on agent traffic.
+4. Modal run with a 7-8B model for the headline numbers, then a Grafana screenshot
+   and a demo GIF for the README.
 
 ## Decisions
 - **Dev environment is WSL2 Ubuntu, not native Windows.** vLLM has no Windows build.

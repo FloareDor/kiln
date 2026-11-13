@@ -42,7 +42,11 @@ COPY --from=build /out/nodeagent /usr/local/bin/nodeagent
 RUN mkdir -p /cache/huggingface /var/log/kiln
 
 EXPOSE 8081
-# The base image sets an entrypoint that launches vLLM directly; clear it so the
-# agent is PID 1 and can supervise vLLM as its child.
-ENTRYPOINT []
-CMD ["/usr/local/bin/nodeagent", "-addr", ":8081", "-python", "python3"]
+# The base image's entrypoint launches vLLM directly. Replace it with the agent so
+# the agent is PID 1 and supervises vLLM as its child.
+#
+# ENTRYPOINT, not CMD: a Kubernetes `args:` list replaces CMD but appends to
+# ENTRYPOINT. With an empty entrypoint the kubelet tries to exec the first argument
+# -- which fails with `exec: "-addr": executable file not found`.
+ENTRYPOINT ["/usr/local/bin/nodeagent"]
+CMD ["-addr", ":8081", "-python", "python3"]

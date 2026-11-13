@@ -27,6 +27,8 @@ func main() {
 		logDir    = flag.String("log-dir", envOr("KILN_LOG_DIR", "/tmp/kiln-logs"), "where per-replica vLLM logs are written")
 		hfHome    = flag.String("hf-home", os.Getenv("HF_HOME"), "shared Hugging Face cache; sharing it is what makes a level-2 wake cheap")
 		startWait = flag.Duration("start-timeout", 15*time.Minute, "how long a cold start may take")
+		advertise = flag.String("advertise-host", envOr("KILN_ADVERTISE_HOST", "127.0.0.1"),
+			"host other components use to reach this node's replicas; set to the pod IP under Kubernetes")
 	)
 	flag.Parse()
 
@@ -34,7 +36,7 @@ func main() {
 
 	sup := nodeagent.NewSupervisor(nodeagent.Config{
 		PythonBin: *python, PortBase: *portBase, LogDir: *logDir,
-		HFHome: *hfHome, StartTimeout: *startWait,
+		HFHome: *hfHome, StartTimeout: *startWait, AdvertiseHost: *advertise,
 	})
 	srv := nodeagent.NewServer(*node, sup, log)
 
@@ -55,7 +57,8 @@ func main() {
 	go srv.PublishMemory(ctx, 2*time.Second)
 
 	go func() {
-		log.Info("node agent listening", "addr", *addr, "node", *node, "python", *python)
+		log.Info("node agent listening", "addr", *addr, "node", *node,
+			"python", *python, "advertise_host", *advertise)
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Error("listen failed", "err", err)
 			os.Exit(1)
