@@ -1,0 +1,78 @@
+{
+  "checks": {
+    "keys_issued": true,
+    "deploy_is_one_call": true,
+    "duplicate_deploy_is_idempotent": true,
+    "model_ready": true,
+    "measurements_recorded": true,
+    "unauthenticated_rejected": true,
+    "bad_key_rejected": true,
+    "tight_team_throttled": true,
+    "retry_after_present": true,
+    "generous_team_unaffected": true,
+    "usage_tracked_per_team": true,
+    "job_was_claimed_before_crash": true,
+    "job_survived_worker_crash": true,
+    "crash_job_was_retried": true
+  },
+  "deploy": {
+    "seconds": 46.1,
+    "status": "READY",
+    "footprint_vram_bytes": 3006477107,
+    "cold_start_ms": 41400,
+    "wake_host_ms": 587,
+    "wake_disk_ms": 710
+  },
+  "tight_team_codes": [
+    200,
+    200,
+    200,
+    429,
+    429,
+    429
+  ],
+  "generous_team_codes": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+  ],
+  "usage": [
+    {
+      "team_id": "generous",
+      "model_id": "qwen-0.5b",
+      "requests": 6,
+      "prompt_tokens": 180,
+      "completion_tokens": 24
+    },
+    {
+      "team_id": "tight",
+      "model_id": "qwen-0.5b",
+      "requests": 3,
+      "prompt_tokens": 90,
+      "completion_tokens": 12
+    }
+  ],
+  "crash_job": {
+    "id": "bd6e3430-4b4e-457c-933f-532bb73a33ae",
+    "model_id": "crash-test",
+    "kind": "deploy",
+    "status": "DONE",
+    "attempts": 2,
+    "max_attempts": 3,
+    "payload": {
+      "id": "crash-test",
+      "hf_repo": "Qwen/Qwen2.5-0.5B-Instruct",
+      "replicas": 1,
+      "enforce_eager": true,
+      "max_model_len": 1024,
+      "gpu_memory_utilization": 0.3
+    },
+    "run_after": "2026-11-13T04:51:40.784299-05:00",
+    "created_at": "2026-11-13T04:51:40.784299-05:00",
+    "updated_at": "2026-11-13T04:53:14.17314-05:00"
+  },
+  "PASS": true
+}

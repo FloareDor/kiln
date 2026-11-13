@@ -5,7 +5,11 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/sairavig/kiln/internal/metrics"
 )
 
 // NodeStatus is what GET /status returns: everything the control plane needs to make
@@ -41,7 +45,49 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("DELETE /replicas/{id}", s.stop)
 	mux.HandleFunc("POST /replicas/{id}/sleep", s.sleep)
 	mux.HandleFunc("POST /replicas/{id}/wake", s.wake)
+	mux.Handle("GET /metrics", promhttp.Handler())
 	return mux
+}
+
+// PublishMemory exports this node's GPU and host memory to Prometheus.
+//
+// Host memory is published alongside VRAM because it is the real ceiling on the host
+// tier: VRAM decides how many models can be *active*, host RAM decides how many can
+// be kept warm, and running out of the latter gets the node OOM-killed rather than
+// merely slowed down.
+func (s *Server) PublishMemory(ctx context.Context, every time.Duration) {
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			if gpus, err := s.GPU.Query(ctx); err == nil {
+				for _, g := range gpus {
+					dev := strconv.Itoa(g.Index)
+					metrics.GPUMemoryBytes.WithLabelValues(s.Node, dev, "total").Set(float64(g.TotalBytes))
+					metrics.GPUMemoryBytes.WithLabelValues(s.Node, dev, "used").Set(float64(g.UsedBytes))
+					metrics.GPUMemoryBytes.WithLabelValues(s.Node, dev, "free").Set(float64(g.FreeBytes))
+				}
+			}
+			if h, err := ReadHostInfo(); err == nil {
+				metrics.HostMemoryBytes.WithLabelValues(s.Node, "total").Set(float64(h.TotalBytes))
+				metrics.HostMemoryBytes.WithLabelValues(s.Node, "available").Set(float64(h.AvailableBytes))
+			}
+			byState := map[string]int{}
+			for _, r := range s.Sup.List() {
+				byState[r.State]++
+			}
+			for _, st := range []string{"COLD", "STARTING", "ACTIVE", "DRAINING",
+				"SLEEPING_L1", "SLEEPING_L2", "WAKING", "FAILED"} {
+				// Publish every state, including the zeros. A gauge that simply
+				// disappears when a state empties leaves the last value on the
+				// dashboard forever, which reads as a model stuck in that state.
+				metrics.ModelsByState.WithLabelValues(st).Set(float64(byState[st]))
+			}
+		}
+	}
 }
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
@@ -85,6 +131,8 @@ func (s *Server) start(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error(), "replica": st})
 		return
 	}
+	metrics.ColdStarts.WithLabelValues(spec.Model).Inc()
+	metrics.SwapDuration.WithLabelValues(spec.Model, "none", "gpu").Observe(float64(st.ColdStartMS) / 1000)
 	s.Log.Info("replica started", "replica", spec.Replica, "port", st.Port, "cold_start_ms", st.ColdStartMS)
 	writeJSON(w, http.StatusOK, st)
 }
@@ -120,11 +168,18 @@ func (s *Server) sleep(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 10*time.Minute)
 	defer cancel()
 
+	start := time.Now()
 	st, err := s.Sup.Sleep(ctx, r.PathValue("id"), body.Level, body.Mode)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error(), "replica": st})
 		return
 	}
+	to := "host"
+	if body.Level == 2 {
+		to = "disk"
+	}
+	metrics.SwapDuration.WithLabelValues(st.Spec.Model, "gpu", to).Observe(time.Since(start).Seconds())
+	metrics.Evictions.WithLabelValues(st.Spec.Model, to, "agent").Inc()
 	s.Log.Info("replica slept", "replica", r.PathValue("id"), "level", body.Level, "state", st.State)
 	writeJSON(w, http.StatusOK, st)
 }
@@ -133,11 +188,19 @@ func (s *Server) wake(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 15*time.Minute)
 	defer cancel()
 
+	start := time.Now()
 	st, err := s.Sup.Wake(ctx, r.PathValue("id"))
 	if err != nil {
+		metrics.SwapFailures.WithLabelValues(st.Spec.Model, "wake").Inc()
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error(), "replica": st})
 		return
 	}
+	from := "host"
+	if st.WakeDiskMS > st.WakeHostMS {
+		from = "disk"
+	}
+	metrics.SwapDuration.WithLabelValues(st.Spec.Model, from, "gpu").Observe(time.Since(start).Seconds())
+	metrics.Wakes.WithLabelValues(st.Spec.Model, from).Inc()
 	s.Log.Info("replica woke", "replica", r.PathValue("id"),
 		"wake_host_ms", st.WakeHostMS, "wake_disk_ms", st.WakeDiskMS)
 	writeJSON(w, http.StatusOK, st)

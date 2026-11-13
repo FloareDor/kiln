@@ -1,0 +1,336 @@
+# Kiln on Kubernetes.
+#
+# The shape of this file is the architectural argument of the project:
+#
+#   * the node agent is a DaemonSet, one pod per GPU node, and it is the ONLY thing
+#     that requests nvidia.com/gpu. Kubernetes grants a pod exclusive use of a GPU for
+#     the pod's entire lifetime, so one-pod-per-model would pin exactly one model to
+#     each GPU forever. Putting a long-lived supervisor on the GPU and running vLLM as
+#     its child processes is what makes sharing -- and therefore tiering -- possible.
+#
+#   * the gateway and control plane are ordinary Deployments with no GPU. They are
+#     separate so the data path survives the control path: the gateway keeps routing
+#     from its own polled view of the fleet when the control plane is down.
+#
+#   * Postgres is a StatefulSet with a volume claim, because API keys and usage must
+#     outlive a pod restart.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kiln
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kiln-secrets
+  namespace: kiln
+type: Opaque
+stringData:
+  # Replace before any real use. Committed only so `make up` works on a laptop.
+  postgres-password: kiln
+  admin-token: change-me-before-using-this-anywhere
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kiln-config
+  namespace: kiln
+data:
+  KILN_AGENTS: "http://kiln-nodeagent.kiln.svc.cluster.local:8081"
+  KILN_ROUTER: "round-robin"
+---
+# ----------------------------------------------------------------------- Postgres
+apiVersion: v1
+kind: Service
+metadata:
+  name: kiln-postgres
+  namespace: kiln
+spec:
+  clusterIP: None
+  selector:
+    app: kiln-postgres
+  ports:
+    - port: 5432
+      name: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kiln-postgres
+  namespace: kiln
+spec:
+  serviceName: kiln-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kiln-postgres
+  template:
+    metadata:
+      labels:
+        app: kiln-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          env:
+            - name: POSTGRES_DB
+              value: kiln
+            - name: POSTGRES_USER
+              value: kiln
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: kiln-secrets, key: postgres-password }
+            # Postgres refuses to initialise into a non-empty directory, and a PVC
+            # mounted at /var/lib/postgresql/data arrives containing lost+found.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "kiln"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 1Gi }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+---
+# ---------------------------------------------------------- shared weight cache
+# One cache shared by every replica on a node. This is what makes a level-2 wake
+# cheap: the weights are re-read from the host page cache rather than fetched again.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kiln-hf-cache
+  namespace: kiln
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 100Gi
+---
+# --------------------------------------------------------------------- node agent
+apiVersion: v1
+kind: Service
+metadata:
+  name: kiln-nodeagent
+  namespace: kiln
+  labels:
+    app: kiln-nodeagent
+spec:
+  clusterIP: None            # headless: the control plane addresses agents individually
+  selector:
+    app: kiln-nodeagent
+  ports:
+    - port: 8081
+      name: http
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kiln-nodeagent
+  namespace: kiln
+spec:
+  selector:
+    matchLabels:
+      app: kiln-nodeagent
+  template:
+    metadata:
+      labels:
+        app: kiln-nodeagent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8081"
+    spec:
+      # Only GPU nodes. On a single-node minikube this selector matches the one node;
+      # on a mixed cluster it keeps the agent off CPU-only workers where it would
+      # start, find no device, and fail every placement.
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      # A vLLM process can take minutes to shut down cleanly, and SIGKILLing it
+      # leaves the GPU allocation behind for the next pod to trip over.
+      terminationGracePeriodSeconds: 180
+      containers:
+        - name: nodeagent
+          image: kiln/nodeagent:dev
+          imagePullPolicy: IfNotPresent
+          args: ["-addr", ":8081", "-python", "python3", "-log-dir", "/var/log/kiln"]
+          env:
+            - name: KILN_NODE
+              valueFrom:
+                fieldRef: { fieldPath: spec.nodeName }
+            - name: HF_HOME
+              value: /cache/huggingface
+            # Gates vLLM's /sleep, /wake_up and /collective_rpc. Without it those
+            # endpoints 404 and tiering is impossible.
+            - name: VLLM_SERVER_DEV_MODE
+              value: "1"
+          ports:
+            - containerPort: 8081
+              name: http
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+            requests:
+              cpu: "2"
+              memory: 8Gi
+          # Readiness only. A liveness probe here is actively harmful: a cold start
+          # can block the agent's event loop long enough to look dead, and restarting
+          # mid-load orphans a vLLM process still holding the GPU.
+          readinessProbe:
+            httpGet: { path: /health, port: 8081 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: hf-cache
+              mountPath: /cache/huggingface
+            - name: logs
+              mountPath: /var/log/kiln
+            - name: shm
+              mountPath: /dev/shm
+      volumes:
+        - name: hf-cache
+          persistentVolumeClaim:
+            claimName: kiln-hf-cache
+        - name: logs
+          emptyDir: {}
+        # vLLM's engine core talks to its workers over shared memory. The default
+        # 64MB /dev/shm is far too small and produces a bus error during startup
+        # that reads as an unrelated CUDA failure.
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Gi
+---
+# ------------------------------------------------------------------ control plane
+apiVersion: v1
+kind: Service
+metadata:
+  name: kiln-controlplane
+  namespace: kiln
+spec:
+  selector:
+    app: kiln-controlplane
+  ports:
+    - port: 8082
+      name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kiln-controlplane
+  namespace: kiln
+spec:
+  # Two replicas on purpose. The deploy queue uses FOR UPDATE SKIP LOCKED plus
+  # leases, so several control planes draining one queue is the designed-for case,
+  # not an accident -- and running two here is what keeps that property honest.
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kiln-controlplane
+  template:
+    metadata:
+      labels:
+        app: kiln-controlplane
+    spec:
+      containers:
+        - name: controlplane
+          image: kiln/controlplane:dev
+          imagePullPolicy: IfNotPresent
+          args: ["-addr", ":8082", "-workers", "2"]
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: kiln-secrets, key: postgres-password }
+            - name: KILN_DATABASE_URL
+              value: postgres://kiln:$(POSTGRES_PASSWORD)@kiln-postgres.kiln.svc.cluster.local:5432/kiln?sslmode=disable
+            - name: KILN_ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef: { name: kiln-secrets, key: admin-token }
+          envFrom:
+            - configMapRef: { name: kiln-config }
+          ports:
+            - containerPort: 8082
+          readinessProbe:
+            httpGet: { path: /health, port: 8082 }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 512Mi }
+---
+# ------------------------------------------------------------------------ gateway
+apiVersion: v1
+kind: Service
+metadata:
+  name: kiln-gateway
+  namespace: kiln
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+spec:
+  type: NodePort
+  selector:
+    app: kiln-gateway
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080
+      name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kiln-gateway
+  namespace: kiln
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kiln-gateway
+  template:
+    metadata:
+      labels:
+        app: kiln-gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      # Long enough for in-flight streaming generations to finish. Cutting a stream
+      # at shutdown hands the client a truncated answer with no error, which is
+      # worse than a slightly slower rollout.
+      terminationGracePeriodSeconds: 90
+      containers:
+        - name: gateway
+          image: kiln/gateway:dev
+          imagePullPolicy: IfNotPresent
+          args: ["-addr", ":8080"]
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: kiln-secrets, key: postgres-password }
+            - name: KILN_DATABASE_URL
+              value: postgres://kiln:$(POSTGRES_PASSWORD)@kiln-postgres.kiln.svc.cluster.local:5432/kiln?sslmode=disable
+          envFrom:
+            - configMapRef: { name: kiln-config }
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 200m, memory: 128Mi }
+            limits: { memory: 512Mi }

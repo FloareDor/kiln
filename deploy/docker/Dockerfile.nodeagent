@@ -1,0 +1,48 @@
+# Node agent: the Go supervisor plus the vLLM runtime it spawns.
+#
+# They share one image deliberately. The agent runs vLLM as a child process rather
+# than as a separate container, because Kubernetes grants a pod exclusive use of a GPU
+# for the pod's whole lifetime -- so one container per model would pin one model per
+# GPU forever and make tiering impossible. Splitting the image would mean the agent
+# could not exec the interpreter it needs.
+
+ARG VLLM_VERSION=0.32.0
+ARG GO_VERSION=1.27.4
+
+# ---------------------------------------------------------------- build the agent
+FROM golang:${GO_VERSION} AS build
+WORKDIR /src
+# Copy the module files first so dependency download is cached independently of
+# source changes; without this every edit re-downloads the whole module graph.
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+# CGO off: the GPU is read through nvidia-smi rather than NVML-via-cgo, which keeps
+# the binary static and cross-compilable. NVML's only advantage is per-process
+# accounting, which does not work under WSL2 anyway (see docs/PROGRESS.md, M0).
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/nodeagent ./cmd/nodeagent
+
+# ------------------------------------------------------------------- runtime image
+FROM vllm/vllm-openai:v${VLLM_VERSION}
+
+# Pinned, not :latest. Sleep mode has shipped broken in past releases, and M0's
+# verification is only meaningful for the exact version it ran against.
+LABEL org.opencontainers.image.title="kiln-nodeagent"
+LABEL kiln.vllm.version="${VLLM_VERSION}"
+
+# Gates vLLM's /sleep, /wake_up, /is_sleeping and /collective_rpc endpoints. Without
+# it they 404 and the entire tiering feature is unreachable over HTTP.
+ENV VLLM_SERVER_DEV_MODE=1
+# A shared weight cache across replicas is what makes a level-2 wake cheap: the
+# weights come back from the host page cache rather than from the network.
+ENV HF_HOME=/cache/huggingface
+ENV KILN_LOG_DIR=/var/log/kiln
+
+COPY --from=build /out/nodeagent /usr/local/bin/nodeagent
+RUN mkdir -p /cache/huggingface /var/log/kiln
+
+EXPOSE 8081
+# The base image sets an entrypoint that launches vLLM directly; clear it so the
+# agent is PID 1 and can supervise vLLM as its child.
+ENTRYPOINT []
+CMD ["/usr/local/bin/nodeagent", "-addr", ":8081", "-python", "python3"]

@@ -18,9 +18,9 @@ Last updated: 2026-11-13
 |---|---|---|
 | M0 | Sanity check: vLLM sleep/wake frees + restores VRAM | done |
 | M1 | Gateway + node agent, one model, streaming | done |
-| M2 | Postgres, auth, quotas, deploy jobs | in progress |
-| M3 | Multiple replicas + Kubernetes | todo |
-| M4 | Observability + load testing | todo |
+| M2 | Postgres, auth, quotas, deploy jobs | done |
+| M3 | Multiple replicas + Kubernetes | in progress |
+| M4 | Observability + load testing | metrics done; Locust todo |
 | M5 | Model swapping (the main feature) | policy core done; executor todo |
 | M6 | Prefix-aware routing | todo |
 | M7 | Modal scale run + README polish | todo |
@@ -44,11 +44,21 @@ shared fitting loop. Pure, no I/O, 29 tests, no GPU.
 **Routing core (M6 logic, built early).** `internal/routing`: all four routers and
 cumulative prefix block hashing. Pure, 18 tests.
 
+**M2 - Postgres, auth, quotas, crash-safe jobs.** All 14 acceptance checks pass.
+One-call deploy reaches READY in 46 s and records its own measurements (VRAM 2867 MiB,
+cold start 41.4 s, wake L1 587 ms, wake L2 710 ms). A 3 rpm team gets
+`200 200 200 429 429 429` with `Retry-After: 19` while a 600 rpm team is unaffected. A
+`SIGKILL`ed control plane's job is reclaimed from its expired lease and finished by a
+replacement: DONE after 2 attempts. Three real bugs found and fixed, written up in
+`docs/PROGRESS.md`.
+
 ## Next up
-**M2 - Postgres, auth, quotas, deploy jobs.** The schema and the quota limiter are
-written and tested. What remains: the pgx store, the job worker using
-`FOR UPDATE SKIP LOCKED` plus leases, the admin deployment API, and an end-to-end
-proving a job survives a worker crash.
+**M3 - multiple replicas + Kubernetes.** Manifests, Dockerfiles and the Makefile are
+written (node agent as a DaemonSet owning the GPU; gateway and control plane as
+Deployments; Postgres as a StatefulSet; Prometheus + Grafana). What remains: bring up
+minikube with GPU passthrough, verify `make up`, and show requests spreading across
+replicas. Open risk: 8 GB is tight for two replicas even of a 0.5B model at
+`gpu_memory_utilization 0.35`, so the replica experiment may need `0.2` or Modal.
 
 ## Decisions
 - **Dev environment is WSL2 Ubuntu, not native Windows.** vLLM has no Windows build.

@@ -163,6 +163,109 @@ and an unescaped `/` would retarget the request entirely.
 
 ---
 
+## M2 - Postgres, auth, quotas, concurrency-safe deploy jobs
+
+**Status: done. All 14 acceptance checks pass (`scripts/e2e_m2.py`).**
+
+Three claims, each checked end to end against a real Postgres and the local GPU.
+
+### 1. Deploying a model is one API call
+
+`POST /admin/models {"hf_repo": "Qwen/Qwen2.5-0.5B-Instruct", ...}` returns `202` with
+a job id. A worker claims the job, downloads the weights, starts vLLM, measures the
+footprint and both wake costs, and marks the model `READY`.
+
+| | |
+|---|---|
+| time to READY | **46 s** |
+| measured VRAM footprint | 2867 MiB |
+| measured cold start | 41.4 s |
+| measured wake L1 / L2 | **587 ms / 710 ms** |
+
+Those measurements are the point of doing it this way. The cost-aware eviction policy
+in M5 scores victims by `rate x wake-cost / GB`, and if the wake costs were guessed
+rather than measured, the policy would be confidently wrong on this exact GPU.
+
+### 2. Two teams with different quotas are throttled correctly
+
+| team | limit | observed status codes | `Retry-After` |
+|---|---|---|---|
+| `tight` | 3 rpm | `200 200 200 429 429 429` | 19 |
+| `generous` | 600 rpm | `200 200 200 200 200 200` | - |
+
+No key and an invalid key both return `401`. Usage is attributed per team and per
+model (`generous`: 6 requests / 180 prompt / 24 completion tokens; `tight`: 3 / 90 /
+12), including for streaming requests.
+
+### 3. A job survives a worker crash
+
+The control plane is `SIGKILL`ed mid-deploy - no failure reported, no completion, no
+lease renewal, nothing. A replacement control plane starts, finds the lapsed lease,
+and finishes the job: **DONE after 2 attempts**.
+
+This is the case a row lock alone cannot handle. `FOR UPDATE SKIP LOCKED` is what lets
+several control planes drain one queue without serialising, but the lock dies with its
+transaction while the work takes minutes. The claim is therefore also a lease
+(`locked_by` + `lease_until`): a crashed worker's lease simply expires, while a merely
+slow worker renews it. `attempts` increments at claim time rather than at failure time,
+because a worker killed mid-job never reports a failure - counting only reported
+failures would let a job that reliably crashes its worker retry forever.
+
+### Three bugs the tests caught
+
+**`RecordMeasurements` would have failed for every real model.** pgx cannot infer a
+parameter's type when it appears only inside a `CASE` expression, so it defaulted to
+`int4` - and every footprint worth storing exceeds 2 GiB. The fix is explicit
+`::bigint` casts. This failed on the first real 3 GB write, not in any unit test with
+small numbers, which is exactly why the store suite runs against a real Postgres
+rather than a fake.
+
+**The "idempotent" deploy retry silently rewrote the deployment.** The handler upserted
+the model row first and deduplicated the *job* afterwards, so a bare retry carrying a
+shorter body reset `max_model_len` to the handler default and `enforce_eager` to
+`false`. The already-running deploy then attempted `torch.compile`, shelled out to
+`nvcc`, and died with `PermissionError: [Errno 13]`. Idempotency has to cover the model
+row, not just the job: the in-flight check now happens before any write.
+
+**Nil slices serialised as `null`.** A Go `var out []T` that matches no rows marshals to
+`null`, not `[]`, forcing every client to treat "no rows" as a different type from
+"some rows".
+
+### Design decisions
+
+- **Quota enforcement is in-memory; durable counters are in Postgres.** A token-bucket
+  check that needed a database round trip would add milliseconds to every request and
+  would fail open or closed during a database blip. The limiter is seeded from the
+  database at startup, so a restart does not hand every tenant a fresh daily budget.
+- **RPM uses a token bucket, not a fixed window.** A fixed window lets a team spend a
+  full minute's budget at the end of one window and again at the start of the next -
+  twice the nominal rate in an instant, exactly when a GPU can least absorb it.
+- **Tokens are counted after the fact.** A team at 99% of its budget can start a request
+  that pushes it over. Pre-reserving a worst-case token count would reject requests
+  that would have fit, which is the worse error.
+- **API keys are SHA-256, not bcrypt.** The usual argument for a slow hash is a
+  low-entropy human password; these are 192 bits of CSPRNG output, so there is no
+  dictionary to attack and a slow hash buys nothing but latency on every request. A
+  stored plaintext prefix turns verification into one indexed lookup plus one
+  constant-time compare.
+- **Usage writes are buffered and batched.** A synchronous insert per request would put
+  the database on the gateway's latency path. A crash loses at most one flush interval
+  of rows; the in-memory limiter is updated immediately, so quota enforcement never
+  lags even when the write does.
+- **Deletes go through a job.** An HTTP handler cannot stop vLLM processes on remote
+  nodes within one request, and removing the row without stopping them would orphan
+  processes holding GPU memory that nothing accounts for.
+
+### Environment finding: no CUDA toolkit under WSL
+
+`torch.compile` (inductor) shells out to `nvcc`, which is not installed in WSL, so all
+local work runs with `--enforce-eager`. M0 had already chosen eager deliberately, to
+keep cold-start-versus-wake an honest comparison rather than a CUDA-graph comparison.
+Every benchmark arm runs eager, so the comparisons remain valid; the Modal runs in M7
+can compile.
+
+---
+
 ## M5 (partial) - scheduler core
 
 Built early because it is pure logic that needs no GPU, so it could proceed while

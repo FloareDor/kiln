@@ -50,6 +50,10 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// Export memory and state gauges on a timer so Prometheus sees a live picture
+	// even when no requests are arriving.
+	go srv.PublishMemory(ctx, 2*time.Second)
+
 	go func() {
 		log.Info("node agent listening", "addr", *addr, "node", *node, "python", *python)
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
