@@ -167,6 +167,8 @@ type staticFleet struct {
 
 	mu       sync.Mutex
 	inflight map[string]int
+	gpuTotal int64
+	gpuFree  int64
 }
 
 func (s *staticFleet) Models(context.Context) ([]*store.Model, error) { return s.models, nil }
@@ -188,6 +190,17 @@ func (s *staticFleet) setInFlight(id string, n int) {
 }
 
 func (s *staticFleet) QueueDepth(string) int { return 0 }
+
+// GPU reports no reading by default, so the budget tests keep using the configured
+// total and reservation. Tests that care about foreign memory set gpuTotal/gpuFree.
+func (s *staticFleet) GPU(context.Context) (int64, int64, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.gpuTotal == 0 {
+		return 0, 0, false
+	}
+	return s.gpuTotal, s.gpuFree, true
+}
 
 type fixedPool struct{ c *agentclient.Client }
 
@@ -604,6 +617,35 @@ func TestPinnedModelsAreNeverEvicted(t *testing.T) {
 }
 
 // ---------------------------------------------------------------- accounting
+
+func TestBudgetAccountsForMemoryTheSchedulerDoesNotOwn(t *testing.T) {
+	// A workstation GPU is never empty: the desktop compositor holds about a
+	// gigabyte here, and every sleeping model keeps its CUDA context. Budgeting on
+	// total-minus-a-fixed-reservation over-commits by exactly that much, and the
+	// failure surfaces as "No available memory for the cache blocks" a minute into a
+	// cold start, long after the decision that caused it.
+	h := newHarness(t, 8, 0, scheduler.NewLRU(), model("a", 3))
+	setState(h.ctrl, "a", scheduler.StateActive)
+
+	// 8 GB device: 3 GB is ours, 2 GB belongs to something else, 3 GB free.
+	h.fleet.mu.Lock()
+	h.fleet.gpuTotal = 8 * gb
+	h.fleet.gpuFree = 3 * gb
+	h.fleet.mu.Unlock()
+
+	cs, err := h.ctrl.Snapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The 2 GB we do not account for must come out of the budget, not be handed to
+	// the next model.
+	if got, want := cs.GPU.ReservedBytes, 2*gb; got < want {
+		t.Fatalf("reserved = %d bytes, want at least %d (foreign memory ignored)", got, want)
+	}
+	if free := cs.VRAMFree(); free > 3*gb {
+		t.Fatalf("VRAMFree = %.2f GB, but only 3 GB is actually free", float64(free)/float64(gb))
+	}
+}
 
 func TestUnmeasuredFootprintFallsBackToTheUtilisationCeiling(t *testing.T) {
 	// A model whose footprint was never measured would otherwise be budgeted as

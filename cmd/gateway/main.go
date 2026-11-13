@@ -127,7 +127,8 @@ func main() {
 			os.Exit(2)
 		}
 
-		fleet := swap.NewStoreFleet(st, srv.InFlightForModel, srv.QueueDepth)
+		pool := swap.NewAgentPool()
+		fleet := swap.NewStoreFleet(st, pool, srv.InFlightForModel, srv.QueueDepth)
 		go fleet.Run(ctx)
 
 		scfg := scheduler.DefaultConfig()
@@ -135,7 +136,7 @@ func main() {
 		scfg.DrainDeadline = *drainDeadline
 		scfg.HostRAMBudget = *hostBudget
 
-		ctrl := swap.New(fleet, swap.NewAgentPool(), policy, scfg,
+		ctrl := swap.New(fleet, pool, policy, scfg,
 			scheduler.GPU{Node: "local", TotalBytes: *gpuTotal, ReservedBytes: *gpuReserve},
 			log.With("component", "swap"))
 

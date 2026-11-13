@@ -24,16 +24,23 @@ type StoreFleet struct {
 
 	TTL time.Duration
 
+	// Pool resolves agent clients, used to read device memory.
+	Pool AgentPool
+
 	mu       sync.RWMutex
 	models   []*store.Model
 	replicas map[string][]*store.Replica
 	at       time.Time
+
+	gpuTotal int64
+	gpuFree  int64
+	gpuAt    time.Time
 }
 
 // NewStoreFleet builds a fleet view.
-func NewStoreFleet(s *store.Store, inFlight, queueDepth func(string) int) *StoreFleet {
+func NewStoreFleet(s *store.Store, pool AgentPool, inFlight, queueDepth func(string) int) *StoreFleet {
 	return &StoreFleet{
-		Store: s, InFlightFn: inFlight, QueueDepthFn: queueDepth,
+		Store: s, Pool: pool, InFlightFn: inFlight, QueueDepthFn: queueDepth,
 		TTL: 5 * time.Second, replicas: map[string][]*store.Replica{},
 	}
 }
@@ -130,4 +137,47 @@ func (f *StoreFleet) QueueDepth(modelID string) int {
 		return 0
 	}
 	return f.QueueDepthFn(modelID)
+}
+
+// GPU reports the device's total and free memory, read from a node agent.
+//
+// Cached briefly: it is consulted on every swap decision, and nvidia-smi takes tens
+// of milliseconds, which is fine per scheduler tick and not fine on a request path
+// that is already paying for a wake.
+func (f *StoreFleet) GPU(ctx context.Context) (total, free int64, ok bool) {
+	f.mu.RLock()
+	if time.Since(f.gpuAt) < time.Second && f.gpuTotal > 0 {
+		t, fr := f.gpuTotal, f.gpuFree
+		f.mu.RUnlock()
+		return t, fr, true
+	}
+	agents := f.agentURLs()
+	f.mu.RUnlock()
+
+	for _, url := range agents {
+		st, err := f.Pool.For(url).Status(ctx)
+		if err != nil || len(st.GPUs) == 0 {
+			continue
+		}
+		g := st.GPUs[0]
+		f.mu.Lock()
+		f.gpuTotal, f.gpuFree, f.gpuAt = g.TotalBytes, g.FreeBytes, time.Now()
+		f.mu.Unlock()
+		return g.TotalBytes, g.FreeBytes, true
+	}
+	return 0, 0, false
+}
+
+func (f *StoreFleet) agentURLs() []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, reps := range f.replicas {
+		for _, r := range reps {
+			if !seen[r.AgentURL] {
+				seen[r.AgentURL] = true
+				out = append(out, r.AgentURL)
+			}
+		}
+	}
+	return out
 }

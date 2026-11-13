@@ -162,6 +162,13 @@ func (r *Replica) BaseURL() string {
 // address would leave the node and come back for no reason.
 func (r *Replica) localURL() string { return fmt.Sprintf("http://127.0.0.1:%d", r.port) }
 
+// setPort assigns a new port, used when respawning a stopped replica.
+func (r *Replica) setPort(p int) {
+	r.mu.Lock()
+	r.port = p
+	r.mu.Unlock()
+}
+
 // State returns the current lifecycle state.
 func (r *Replica) State() scheduler.State {
 	r.mu.Lock()

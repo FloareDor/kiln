@@ -114,6 +114,14 @@ func (s *Supervisor) Start(ctx context.Context, spec Spec) (Status, error) {
 		return r.Status(), nil
 	}
 
+	// Take a fresh port before respawning. The previous process may only just have
+	// died, and the kernel keeps its listening socket reserved briefly afterwards, so
+	// reusing the old port fails with "address already in use". The cold baseline
+	// stops and restarts replicas constantly, which is where this showed up.
+	if port, err := freePort(s.cfg.PortBase); err == nil {
+		r.setPort(port)
+	}
+
 	if err := r.Start(ctx); err != nil {
 		return r.Status(), err
 	}

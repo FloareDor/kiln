@@ -42,6 +42,9 @@ type Fleet interface {
 	InFlight(modelID string) int
 	// QueueDepth is the gateway's live count of requests waiting for a model.
 	QueueDepth(modelID string) int
+	// GPU reports the device's total and currently free memory, or ok=false if it
+	// cannot be read. The scheduler uses it to account for memory it does not own.
+	GPU(ctx context.Context) (total, free int64, ok bool)
 }
 
 // AgentPool resolves an agent client from a replica's recorded URL.
@@ -190,6 +193,35 @@ func (c *Controller) Snapshot(ctx context.Context) (*scheduler.ClusterState, err
 
 		cp := *known
 		cs.Models[id] = &cp
+	}
+
+	// Budget against what the device actually reports, not against an assumed total.
+	//
+	// Plenty of VRAM belongs to things the scheduler does not track: the desktop
+	// compositor on a workstation (~1.1 GB here), another tenant's process, and the
+	// ~230 MiB each sleeping model keeps for its CUDA context. Budgeting on
+	// total-minus-a-fixed-reservation over-commits by exactly that amount, and the
+	// failure arrives as "No available memory for the cache blocks" a minute into a
+	// cold start -- long after the decision that caused it.
+	//
+	// Treating everything we do not account for as reserved makes the budget
+	// self-correcting, and makes the scheduler safe to run on a GPU it does not have
+	// to itself.
+	if total, free, ok := c.Fleet.GPU(ctx); ok && total > 0 {
+		var ours int64
+		for _, m := range cs.Models {
+			if m.State.HoldsVRAM() {
+				ours += m.VRAMBytes
+			}
+		}
+		foreign := total - free - ours
+		if foreign < 0 {
+			foreign = 0
+		}
+		cs.GPU.TotalBytes = total
+		// Keep the configured reservation on top as a safety margin for allocator
+		// fragmentation, which no counter reports.
+		cs.GPU.ReservedBytes = foreign + c.GPU.ReservedBytes
 	}
 
 	// Stamp the measured arrival rates and trends the scoring policies read.
