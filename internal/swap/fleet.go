@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sairavig/kiln/internal/store"
+	"github.com/FloareDor/kiln/internal/store"
 )
 
 // StoreFleet implements Fleet over Postgres plus the gateway's live counters.

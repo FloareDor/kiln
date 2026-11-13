@@ -23,11 +23,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sairavig/kiln/internal/agentclient"
-	"github.com/sairavig/kiln/internal/metrics"
-	"github.com/sairavig/kiln/internal/nodeagent"
-	"github.com/sairavig/kiln/internal/scheduler"
-	"github.com/sairavig/kiln/internal/store"
+	"github.com/FloareDor/kiln/internal/agentclient"
+	"github.com/FloareDor/kiln/internal/metrics"
+	"github.com/FloareDor/kiln/internal/nodeagent"
+	"github.com/FloareDor/kiln/internal/scheduler"
+	"github.com/FloareDor/kiln/internal/store"
 )
 
 // Fleet is the controller's view of what is deployed and where. The gateway's

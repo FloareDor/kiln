@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sairavig/kiln/internal/auth"
-	"github.com/sairavig/kiln/internal/store"
+	"github.com/FloareDor/kiln/internal/auth"
+	"github.com/FloareDor/kiln/internal/store"
 )
 
 // Authenticator resolves API keys and enforces quotas on the request path.

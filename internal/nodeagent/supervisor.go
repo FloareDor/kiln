@@ -6,7 +6,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/sairavig/kiln/internal/scheduler"
+	"github.com/FloareDor/kiln/internal/scheduler"
 )
 
 // Supervisor owns every vLLM process on one GPU and serialises the operations that

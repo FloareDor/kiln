@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sairavig/kiln/internal/auth"
+	"github.com/FloareDor/kiln/internal/auth"
 )
 
 // These are integration tests against a real PostgreSQL.

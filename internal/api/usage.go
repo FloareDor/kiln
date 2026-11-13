@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sairavig/kiln/internal/auth"
-	"github.com/sairavig/kiln/internal/routing"
-	"github.com/sairavig/kiln/internal/store"
+	"github.com/FloareDor/kiln/internal/auth"
+	"github.com/FloareDor/kiln/internal/routing"
+	"github.com/FloareDor/kiln/internal/store"
 )
 
 // UsageRecorder buffers per-request usage and flushes it to Postgres in batches.

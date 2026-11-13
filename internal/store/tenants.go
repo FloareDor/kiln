@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/sairavig/kiln/internal/auth"
+	"github.com/FloareDor/kiln/internal/auth"
 )
 
 // Team is a tenant.

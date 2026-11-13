@@ -21,9 +21,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sairavig/kiln/internal/api"
-	"github.com/sairavig/kiln/internal/jobs"
-	"github.com/sairavig/kiln/internal/store"
+	"github.com/FloareDor/kiln/internal/api"
+	"github.com/FloareDor/kiln/internal/jobs"
+	"github.com/FloareDor/kiln/internal/store"
 )
 
 func main() {

@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sairavig/kiln/internal/routing"
+	"github.com/FloareDor/kiln/internal/routing"
 )
 
 func discardLog() *slog.Logger {

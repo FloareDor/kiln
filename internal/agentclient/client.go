@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sairavig/kiln/internal/nodeagent"
+	"github.com/FloareDor/kiln/internal/nodeagent"
 )
 
 // Client talks to one node agent.

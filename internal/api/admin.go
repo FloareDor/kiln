@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sairavig/kiln/internal/auth"
-	"github.com/sairavig/kiln/internal/store"
+	"github.com/FloareDor/kiln/internal/auth"
+	"github.com/FloareDor/kiln/internal/store"
 )
 
 // Admin is the control plane's management API: deployments, teams, keys and usage.

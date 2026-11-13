@@ -1,4 +1,4 @@
-module github.com/sairavig/kiln
+module github.com/FloareDor/kiln
 
 go 1.27.4
 

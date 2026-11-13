@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/sairavig/kiln/internal/metrics"
+	"github.com/FloareDor/kiln/internal/metrics"
 )
 
 // NodeStatus is what GET /status returns: everything the control plane needs to make

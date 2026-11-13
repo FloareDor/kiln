@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sairavig/kiln/internal/agentclient"
-	"github.com/sairavig/kiln/internal/routing"
+	"github.com/FloareDor/kiln/internal/agentclient"
+	"github.com/FloareDor/kiln/internal/routing"
 )
 
 // AgentRegistry builds the gateway's fleet view by polling node agents.

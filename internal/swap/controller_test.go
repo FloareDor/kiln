@@ -15,10 +15,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sairavig/kiln/internal/agentclient"
-	"github.com/sairavig/kiln/internal/nodeagent"
-	"github.com/sairavig/kiln/internal/scheduler"
-	"github.com/sairavig/kiln/internal/store"
+	"github.com/FloareDor/kiln/internal/agentclient"
+	"github.com/FloareDor/kiln/internal/nodeagent"
+	"github.com/FloareDor/kiln/internal/scheduler"
+	"github.com/FloareDor/kiln/internal/store"
 )
 
 const gb = int64(1) << 30

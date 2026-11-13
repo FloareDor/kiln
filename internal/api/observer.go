@@ -3,8 +3,8 @@ package api
 import (
 	"time"
 
-	"github.com/sairavig/kiln/internal/metrics"
-	"github.com/sairavig/kiln/internal/routing"
+	"github.com/FloareDor/kiln/internal/metrics"
+	"github.com/FloareDor/kiln/internal/routing"
 )
 
 // MetricsObserver reports request telemetry to Prometheus.

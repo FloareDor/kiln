@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sairavig/kiln/internal/agentclient"
-	"github.com/sairavig/kiln/internal/nodeagent"
-	"github.com/sairavig/kiln/internal/store"
+	"github.com/FloareDor/kiln/internal/agentclient"
+	"github.com/FloareDor/kiln/internal/nodeagent"
+	"github.com/FloareDor/kiln/internal/store"
 )
 
 // Agent is one node agent the deployer can place replicas on.

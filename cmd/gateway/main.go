@@ -20,12 +20,12 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/sairavig/kiln/internal/api"
-	"github.com/sairavig/kiln/internal/auth"
-	"github.com/sairavig/kiln/internal/routing"
-	"github.com/sairavig/kiln/internal/scheduler"
-	"github.com/sairavig/kiln/internal/store"
-	"github.com/sairavig/kiln/internal/swap"
+	"github.com/FloareDor/kiln/internal/api"
+	"github.com/FloareDor/kiln/internal/auth"
+	"github.com/FloareDor/kiln/internal/routing"
+	"github.com/FloareDor/kiln/internal/scheduler"
+	"github.com/FloareDor/kiln/internal/store"
+	"github.com/FloareDor/kiln/internal/swap"
 )
 
 func main() {

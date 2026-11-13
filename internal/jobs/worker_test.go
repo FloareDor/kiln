@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sairavig/kiln/internal/store"
+	"github.com/FloareDor/kiln/internal/store"
 )
 
 func discardLog() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }

@@ -26,7 +26,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sairavig/kiln/internal/scheduler"
+	"github.com/FloareDor/kiln/internal/scheduler"
 )
 
 // Spec describes one vLLM replica to run.
