@@ -48,6 +48,7 @@ func newFakeAgent(delay time.Duration) *fakeAgent {
 	f := &fakeAgent{state: map[string]string{}, opDelay: delay}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /status", f.status)
+	mux.HandleFunc("POST /replicas", f.start)
 	mux.HandleFunc("POST /replicas/{id}/sleep", f.sleep)
 	mux.HandleFunc("POST /replicas/{id}/wake", f.wake)
 	mux.HandleFunc("DELETE /replicas/{id}", f.stop)
@@ -117,6 +118,16 @@ func (f *fakeAgent) wake(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"wake failed"}`, http.StatusInternalServerError)
 		return
 	}
+	// Mirror the real agent: a stopped replica is forgotten, so waking it is an
+	// error rather than a silent no-op. Without this the fake would hide the very
+	// bug that broke the cold baseline.
+	f.mu.Lock()
+	_, known := f.state[id]
+	f.mu.Unlock()
+	if !known {
+		http.Error(w, `{"error":"nodeagent: unknown replica"}`, http.StatusInternalServerError)
+		return
+	}
 	f.enter()
 	defer f.leave()
 	f.mu.Lock()
@@ -130,7 +141,23 @@ func (f *fakeAgent) stop(w http.ResponseWriter, r *http.Request) {
 	f.record("stop:" + id)
 	f.enter()
 	defer f.leave()
+	f.mu.Lock()
+	delete(f.state, id) // the real agent forgets a stopped replica entirely
+	f.mu.Unlock()
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (f *fakeAgent) start(w http.ResponseWriter, r *http.Request) {
+	var spec nodeagent.Spec
+	_ = json.NewDecoder(r.Body).Decode(&spec)
+	f.record("start:" + spec.Replica)
+	f.enter()
+	defer f.leave()
+	f.mu.Lock()
+	f.state[spec.Replica] = "ACTIVE"
+	f.mu.Unlock()
+	_ = json.NewEncoder(w).Encode(nodeagent.Status{
+		Spec: spec, State: "ACTIVE", ColdStartMS: 35000})
 }
 
 // staticFleet is a deployed fleet with controllable in-flight counts.
@@ -189,6 +216,7 @@ func newHarness(t *testing.T, budgetGB int64, opDelay time.Duration,
 		fleet.replicas[m.ID] = []*store.Replica{
 			{ID: m.ID + "--0", ModelID: m.ID, AgentURL: agent.URL, State: "ACTIVE"},
 		}
+		agent.state[m.ID+"--0"] = "ACTIVE" // deployed, as after a real deploy job
 	}
 
 	cfg := scheduler.DefaultConfig()
@@ -708,6 +736,66 @@ func TestACancelledRequestDoesNotAbortTheSwap(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatalf("the swap was aborted when its caller gave up; state is %s", h.ctrl.States()["a"])
+}
+
+func TestColdBaselineCanRestartWhatItStopped(t *testing.T) {
+	// The cold baseline is only a fair arm if the model it killed can come back. The
+	// agent forgets a stopped replica, so a cold start has to re-create the process
+	// from the registry's spec; treating it as a wake fails with "unknown replica"
+	// and the model is unreachable for the rest of the run -- which silently poisons
+	// every later arm, because they share the agent.
+	h := newHarness(t, 8, 0, scheduler.NewCold(), model("victim", 5), model("target", 5))
+	setState(h.ctrl, "victim", scheduler.StateActive)
+	setState(h.ctrl, "target", scheduler.StateSleepingL1)
+
+	// First swap: the baseline stops the victim's process.
+	if err := h.ctrl.Ensure(context.Background(), "target"); err != nil {
+		t.Fatal(err)
+	}
+	if h.agent.count("stop:victim--0") != 1 {
+		t.Fatalf("victim's process was not stopped: %v", h.agent.opLog())
+	}
+	if got := h.ctrl.States()["victim"]; got != "COLD" {
+		t.Fatalf("victim state = %s, want COLD", got)
+	}
+
+	// Second swap: the stopped model is wanted again and must cold-start.
+	h.ctrl.Config.MinResidency = 0
+	if err := h.ctrl.Ensure(context.Background(), "victim"); err != nil {
+		t.Fatalf("could not restart a model the cold baseline stopped: %v", err)
+	}
+	if h.agent.count("start:victim--0") != 1 {
+		t.Fatalf("expected a cold start, got %v", h.agent.opLog())
+	}
+	if got := h.ctrl.States()["victim"]; got != "ACTIVE" {
+		t.Fatalf("victim state after restart = %s, want ACTIVE", got)
+	}
+}
+
+func TestColdStartUsesTheRegistrySpec(t *testing.T) {
+	// A restarted replica must be configured exactly as the one that was stopped, or
+	// a benchmark arm's conditions change silently halfway through.
+	m := model("a", 3)
+	m.HFRepo = "Qwen/Qwen2.5-0.5B-Instruct"
+	m.MaxModelLen = 2048
+	m.EnforceEager = true
+	m.GPUMemoryUtilization = 0.31
+
+	h := newHarness(t, 8, 0, scheduler.NewLRU(), m)
+	setState(h.ctrl, "a", scheduler.StateCold)
+	delete(h.agent.state, "a--0") // as if its process had been stopped
+
+	if err := h.ctrl.Ensure(context.Background(), "a"); err != nil {
+		t.Fatal(err)
+	}
+	spec, err := h.ctrl.specFor(context.Background(), "a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.HFRepo != m.HFRepo || spec.MaxModelLen != 2048 ||
+		!spec.EnforceEager || spec.GPUMemoryUtilization != 0.31 {
+		t.Fatalf("cold start spec does not match the deployment: %+v", spec)
+	}
 }
 
 func TestEnsureRespectsContextCancellation(t *testing.T) {

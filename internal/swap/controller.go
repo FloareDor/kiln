@@ -25,6 +25,7 @@ import (
 
 	"github.com/sairavig/kiln/internal/agentclient"
 	"github.com/sairavig/kiln/internal/metrics"
+	"github.com/sairavig/kiln/internal/nodeagent"
 	"github.com/sairavig/kiln/internal/scheduler"
 	"github.com/sairavig/kiln/internal/store"
 )
@@ -552,14 +553,32 @@ func (c *Controller) wake(ctx context.Context, id scheduler.ModelID) error {
 }
 
 func (c *Controller) start(ctx context.Context, id scheduler.ModelID) error {
+	// A cold start means no process exists, which is a different operation from a
+	// wake and cannot be served by one. The `cold` eviction policy stops a victim's
+	// process outright -- that is what makes it the no-tiering baseline -- and the
+	// node agent forgets a stopped replica entirely. Asking it to wake one then fails
+	// with "unknown replica", and the model is unreachable for the rest of the run.
+	//
+	// So a cold start re-creates the process from the registry's spec. The spec is
+	// the deployment's own, so a restarted replica is configured identically to the
+	// one that was stopped; anything else would silently change a benchmark arm's
+	// conditions mid-run.
+	spec, err := c.specFor(ctx, id)
+	if err != nil {
+		metrics.SwapFailures.WithLabelValues(string(id), "start").Inc()
+		return err
+	}
+
 	c.setState(id, scheduler.StateStarting)
 	start := time.Now()
 
-	// A cold start means the process is gone, so the model has to be redeployed by
-	// the control plane rather than woken. The controller only reports it; attempting
-	// to start it here would duplicate placement logic and race the deploy workers.
-	err := c.forEachReplica(ctx, id, func(cl *agentclient.Client, replicaID string) error {
-		_, err := cl.Wake(ctx, replicaID)
+	err = c.forEachReplica(ctx, id, func(cl *agentclient.Client, replicaID string) error {
+		s := spec
+		s.Replica = replicaID
+		// Idempotent on the agent side: an already-ACTIVE replica is returned as-is
+		// without touching the GPU, so this is also the safe recovery path when the
+		// controller's view has drifted.
+		_, err := cl.Start(ctx, s)
 		return err
 	})
 	if err != nil {
@@ -571,6 +590,26 @@ func (c *Controller) start(ctx context.Context, id scheduler.ModelID) error {
 	metrics.ColdStarts.WithLabelValues(string(id)).Inc()
 	metrics.SwapDuration.WithLabelValues(string(id), "none", "gpu").Observe(time.Since(start).Seconds())
 	return nil
+}
+
+// specFor rebuilds the vLLM spec for a model from the registry.
+func (c *Controller) specFor(ctx context.Context, id scheduler.ModelID) (nodeagent.Spec, error) {
+	models, err := c.Fleet.Models(ctx)
+	if err != nil {
+		return nodeagent.Spec{}, err
+	}
+	for _, m := range models {
+		if m.ID != string(id) {
+			continue
+		}
+		return nodeagent.Spec{
+			Model: m.ID, HFRepo: m.HFRepo, Revision: m.Revision,
+			GPUMemoryUtilization: m.GPUMemoryUtilization,
+			MaxModelLen:          m.MaxModelLen,
+			EnforceEager:         m.EnforceEager,
+		}, nil
+	}
+	return nodeagent.Spec{}, fmt.Errorf("swap: model %q is not in the registry", id)
 }
 
 func (c *Controller) stop(ctx context.Context, id scheduler.ModelID) error {
