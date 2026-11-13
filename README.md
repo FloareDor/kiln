@@ -10,91 +10,79 @@ It also serves more models than fit in GPU memory, by sleeping idle models out t
 RAM or disk and waking them in under a second instead of reloading them in
 thirty-five.
 
-The current project is an implemented MVP. It is intended to run locally on a single
-GPU with Linux or WSL2, Docker, and minikube, with a later path to multi-node
-clusters and to Modal for larger GPUs.
+This is an implemented MVP. It runs locally on a single GPU with Linux or WSL2,
+Docker and minikube.
 
-![Kiln logo](docs/img/logo.svg)
+```mermaid
+flowchart TB
+    C["OpenAI SDK · curl · Locust"]
 
-![Kiln system design](docs/img/architecture.svg)
+    subgraph GW ["Gateway (Go)"]
+        API["OpenAI routes · API keys · quotas · per-model queue · replica routing"]
+        SWAP["swap controller: drain · evict · wake"]
+    end
 
-## What It Does
+    subgraph CP ["Control plane (Go)"]
+        JOBS["admin API · deploy workers (SKIP LOCKED + leases)"]
+    end
 
-Kiln lets you:
+    subgraph NA ["Node agent — one per GPU, the only pod holding a GPU"]
+        V1["vLLM"]
+        V2["vLLM"]
+        V3["vLLM"]
+    end
 
-- Deploy a Hugging Face model with a single API call.
-- Send OpenAI-compatible `/v1/chat/completions` and `/v1/completions` requests, with
-  streaming.
-- List deployed models and their state.
-- Create teams, issue API keys, and set per-team limits on requests per minute,
-  tokens per day, and concurrent requests.
-- Track token usage per team and per model, including for streaming responses.
-- Scale a model to several replicas and route across them four different ways.
-- Run deployment jobs from several control planes at once, and recover a job whose
-  worker was killed mid-deploy.
-- Serve more models than fit in VRAM, by sleeping idle ones to CPU RAM or disk.
-- Watch latency, throughput, queue depth, GPU memory and swap activity in Grafana.
+    DB[("PostgreSQL")]
 
-The Go gateway is the request path and router. The control plane owns deployments.
-One node agent per GPU supervises the vLLM processes that do the actual inference.
-
-## Prerequisites
-
-Install these before running the project locally:
-
-- An NVIDIA GPU with recent drivers
-- Linux, or Windows with WSL2 (vLLM has no native Windows build)
-- Python 3.12
-- Go 1.24+
-- PostgreSQL 16+
-- Docker, plus `minikube` and `kubectl` for the Kubernetes path
-
-Debian/Ubuntu, including inside WSL2:
-
-```bash
-sudo apt-get update
-sudo apt-get install -y python3.12 python3.12-venv postgresql make curl git
-
-# Go
-curl -fsSLo go.tar.gz https://go.dev/dl/go1.24.0.linux-amd64.tar.gz
-sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go.tar.gz
-export PATH=$PATH:/usr/local/go/bin
-
-# kubectl and minikube
-curl -fsSLo kubectl "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-sudo install kubectl /usr/local/bin/
-curl -fsSLo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-sudo install minikube /usr/local/bin/
+    C --> API
+    API --> NA
+    SWAP -->|sleep / wake| NA
+    API --> DB
+    JOBS --> DB
+    JOBS -->|start / stop| NA
 ```
 
-Confirm the GPU is visible:
+The gateway is the request path. The control plane owns deployments. One node agent
+per GPU supervises the vLLM processes that do the inference.
 
-```bash
-nvidia-smi
+## Does sleep mode actually work?
+
+This is the first thing to check, because everything else rests on it. `make m0` loads
+a model, sleeps it, wakes it, and verifies both that GPU memory came back and that the
+model still produces the same text:
+
 ```
+  label                          device    vllm    time   note
+  baseline (no server)             1318       0       -
+  ACTIVE (cold start)              4244    2926   38.90s  ref=' Paris. It was founded in 789 AD by'
+  SLEEPING_L1                      1549     231    1.47s  is_sleeping=True
+  ACTIVE (woke from L1)            4245    2927    0.88s  out=' Paris. It was founded in 789 AD by'  OK
+  SLEEPING_L2                      1549     231    0.05s  is_sleeping=True
+  ACTIVE (L2 wake, no reload)      4245    2927    0.45s  out='!!!!!!!!!!!!'  GARBAGE
+  ACTIVE (L2 wake + reload)        4505    3187    1.87s  out=' Paris. It was founded in 789 AD by'  OK
+  ACTIVE (2nd cold start)          4244    2926   34.34s  warm page cache
+
+  resident 2926 MiB   freed by sleep 2695 MiB (92.1%)
+  wake 0.88s vs cold start 34.34s   =  39x
+```
+
+Note the `GARBAGE` line. vLLM's level-2 sleep discards the weights, and `/wake_up`
+restores the allocator and the model's buffers but not the weights themselves — so it
+returns `200` in 0.45s and then generates nonsense. The fix is to follow it with
+`collective_rpc{"method": "reload_weights"}`, which costs 1.87s. The broken wake is
+four times *faster* than the correct one, so a benchmark that only timed things would
+have ranked it first. Every wake is now checked against a pre-sleep reference string.
 
 ## Quick Start
 
 ```bash
 git clone https://github.com/FloareDor/kiln && cd kiln
-make setup
-make build
-make m0
+make setup     # vLLM 0.32.0 in a venv, Go toolchain, PostgreSQL
+make build     # bin/gateway, bin/controlplane, bin/nodeagent
+make m0        # the check above
 ```
 
-`make setup` does the full local setup:
-
-- Creates a Python 3.12 virtualenv and installs vLLM 0.32.0 into it.
-- Installs a current Go toolchain.
-- Installs PostgreSQL, creates the `kiln` and `kiln_test` databases, and prints their
-  connection strings.
-
-`make build` produces `bin/gateway`, `bin/controlplane` and `bin/nodeagent`.
-
-`make m0` checks that vLLM sleep mode actually frees GPU memory and restores a working
-model. Run it before anything else.
-
-### Start the services
+Start the three services:
 
 ```bash
 make db
@@ -105,38 +93,24 @@ export KILN_DATABASE_URL="postgres://kiln:kiln@127.0.0.1:5433/kiln?sslmode=disab
 ./bin/gateway      -addr :8080 -agents http://127.0.0.1:8081 -policy cost-aware &
 ```
 
-### Create a team and an API key
+Create a team, mint a key, deploy a model:
 
 ```bash
-curl -sX POST localhost:8082/admin/teams \
-  -H "Authorization: Bearer secret" \
+curl -sX POST localhost:8082/admin/teams -H "Authorization: Bearer secret" \
   -d '{"id":"acme","rpm":60,"tokens_per_day":1000000,"max_concurrency":8}'
 
 KEY=$(curl -sX POST localhost:8082/admin/teams/acme/keys \
       -H "Authorization: Bearer secret" | jq -r .api_key)
-```
 
-The key is shown once. Only a hash is stored.
-
-### Deploy a model
-
-```bash
-curl -sX POST localhost:8082/admin/models \
-  -H "Authorization: Bearer secret" \
+curl -sX POST localhost:8082/admin/models -H "Authorization: Bearer secret" \
   -d '{"id":"qwen","hf_repo":"Qwen/Qwen2.5-0.5B-Instruct","gpu_memory_utilization":0.35}'
 ```
 
-This returns a job id immediately. A worker downloads the weights, starts vLLM,
-measures the model's GPU footprint and wake costs, and marks it `READY`. Check on it
-with:
+The deploy call returns a job id straight away. A worker downloads the weights, starts
+vLLM, measures the model's footprint and wake costs, and marks it `READY` — about 45
+seconds for a 0.5B model.
 
-```bash
-curl -s localhost:8082/admin/models/qwen -H "Authorization: Bearer secret" | jq
-```
-
-### Send a request
-
-Any OpenAI client works. Only the base URL changes:
+Then any OpenAI client works, changing only the base URL:
 
 ```python
 from openai import OpenAI
@@ -151,95 +125,78 @@ for chunk in client.chat.completions.create(
     print(chunk.choices[0].delta.content or "", end="", flush=True)
 ```
 
-### Kubernetes
+On Kubernetes, `make cluster` starts minikube with GPU passthrough and the NVIDIA
+device plugin, and `make up` deploys everything plus Prometheus and Grafana.
+
+## Prerequisites
+
+- An NVIDIA GPU with recent drivers
+- Linux, or Windows with WSL2 — vLLM has no native Windows build
+- Python 3.12, Go 1.24+, PostgreSQL 16+
+- Docker, plus `minikube` and `kubectl` for the Kubernetes path
+
+On Debian/Ubuntu, including inside WSL2:
 
 ```bash
-make cluster
-make up
+sudo apt-get update
+sudo apt-get install -y python3.12 python3.12-venv postgresql make curl git
+
+curl -fsSLo go.tar.gz https://go.dev/dl/go1.24.0.linux-amd64.tar.gz
+sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go.tar.gz
+export PATH=$PATH:/usr/local/go/bin
 ```
 
-`make cluster` starts minikube with GPU passthrough and the NVIDIA device plugin.
-`make up` builds the images, loads them into the cluster, and deploys the stack with
-Prometheus and Grafana.
+Check `nvidia-smi` works before going further.
 
-## Make Commands
+## Tiering
 
-| Target | Purpose |
-|---|---|
-| `make setup` | Installs vLLM, the Go toolchain and PostgreSQL. |
-| `make build` | Builds the three binaries into `bin/`. |
-| `make db` | Starts PostgreSQL and applies migrations. |
-| `make test` | Runs unit tests. No GPU, database or network needed. |
-| `make test-all` | Adds the PostgreSQL integration suites. |
-| `make cover` | Prints a test coverage summary. |
-| `make vet` | Runs `go vet`. |
-| `make m0` | Verifies vLLM sleep mode frees and restores GPU memory. |
-| `make m1` | End-to-end test: the OpenAI SDK streams from the platform. |
-| `make m2` | End-to-end test: one-call deploy, quotas, crash-safe jobs. |
-| `make images` | Builds the three container images. |
-| `make cluster` | Starts a local GPU-enabled minikube cluster. |
-| `make up` | Deploys the stack plus Prometheus and Grafana. |
-| `make down` | Removes the stack. |
-| `make logs` | Tails node agent logs. |
-| `make traces` | Regenerates the benchmark traces. |
-| `make bench EXP=5` | Runs a benchmark experiment. |
-| `make clean` | Removes build output. |
+When more models are wanted than fit in VRAM, idle ones get paged out rather than
+unloaded. Measured on an RTX 3070 Laptop (8 GB), vLLM 0.32.0, eager mode:
 
-## How It Works
+| Model | Resident VRAM | Cold start | Wake from CPU RAM | Wake from disk |
+|---|---|---|---|---|
+| Qwen2.5-0.5B | 2458 MiB | 35.3 s | 0.59 s | 0.71 s |
+| Qwen3-0.6B | 2621 MiB | 35.9 s | 0.82 s | 1.05 s |
+| Qwen2.5-1.5B | 4506 MiB | 37.4 s | 1.54 s | 1.81 s |
 
-Three processes:
+Cold start barely moves with model size, because it is mostly process spawn, CUDA
+init and memory profiling rather than reading weights. Wake cost does scale with the
+weights, so the gap narrows from 60x to 24x as models grow.
 
-- **Node agent.** Owns one GPU and runs vLLM as child processes. Kubernetes gives a
-  pod exclusive use of a GPU for the pod's whole lifetime, so one Deployment per model
-  would pin one model to each GPU permanently. A long-lived supervisor that starts,
-  sleeps, wakes and stops models underneath it is what lets a GPU be shared. The same
-  binary runs standalone under Docker with no Kubernetes.
-- **Control plane.** Owns deployments: what models exist, what they cost, where they
-  are placed. Runs the deployment job workers.
-- **Gateway.** The request path. Authenticates, applies quotas, queues, routes to a
-  replica, streams the response back, and decides which models are resident in VRAM.
+Every model moves through one state machine:
 
-The gateway keeps serving when the control plane is down. It polls node agents for its
-view of the fleet rather than reading the database, so a control-plane outage stops new
-deployments but not inference.
+```mermaid
+stateDiagram-v2
+    [*] --> COLD
+    COLD --> STARTING
+    STARTING --> ACTIVE
+    ACTIVE --> DRAINING : evict
+    DRAINING --> SLEEPING_L1 : hot, host RAM free
+    DRAINING --> SLEEPING_L2 : cold, or host RAM full
+    DRAINING --> ACTIVE : wanted again, no swap paid
+    SLEEPING_L1 --> WAKING
+    SLEEPING_L2 --> WAKING
+    SLEEPING_L1 --> SLEEPING_L2 : idle demote
+    WAKING --> ACTIVE
+```
 
-### Deployment jobs
+An eviction drains first, so a model is never slept while it still has requests in
+flight, and a wake never starts while the model being evicted still holds its memory.
+Fifty concurrent requests for one sleeping model produce exactly one wake.
 
-Deploying takes minutes and has to survive its worker being killed. Jobs are claimed
-with `SELECT ... FOR UPDATE SKIP LOCKED` so several control planes can drain one queue
-without blocking each other, plus a lease, because the row lock dies with its
-transaction while the work does not. A crashed worker's lease expires and another
-worker picks the job up. A slow worker renews it.
+Which model gets evicted is pluggable, chosen with `-policy`: `cold` (kill the
+process — the no-tiering baseline), `lru`, `lfu-decay`, `cost-aware`
+(`rate × wake_cost / GB_freed`), and `predictive-prewarm`. Three guards stop
+thrashing: a minimum residency time, hysteresis when freeing memory, and idle
+demotion of sleepers nobody wants.
 
-### GPU memory tiering
+I am not claiming a ranking between the policies. Comparing them needs sustained
+memory pressure, and on an 8 GB card that means running at the edge of the device,
+where swap operations contend with inference — a wake measured at 0.59s idle took 81s
+under load. The mechanism above is measured; the policy comparison needs a GPU with
+headroom. [`docs/PROGRESS.md`](docs/PROGRESS.md) has the full reasoning.
 
-When more models are wanted than fit in VRAM, Kiln pages idle ones out instead of
-unloading them.
-
-![How tiering works](docs/img/tiering.svg)
-
-Every model moves through one state machine. An eviction drains first, so a model is
-never slept while it still has requests in flight, and a wake never starts while the
-model being evicted still holds its memory.
-
-![Model state machine](docs/img/state-machine.svg)
-
-Which model is evicted is a pluggable policy, selected with `-policy`:
-
-| Policy | Evicts the model with the lowest |
-|---|---|
-| `cold` | last-request time, and kills the process. The no-tiering baseline. |
-| `lru` | last-request time |
-| `lfu-decay` | exponentially decayed arrival rate |
-| `cost-aware` | `rate × wake_cost / GB_freed` |
-| `predictive-prewarm` | same as cost-aware, and wakes models whose demand is rising |
-
-Three guards prevent thrashing: a minimum residency time before a model can be
-evicted again, hysteresis so freeing memory does not leave the GPU exactly full, and
-idle demotion so a sleeper nobody wants gives back its host RAM. Fifty concurrent
-requests for one sleeping model produce exactly one wake.
-
-### Routing across replicas
+## Routing
 
 With several replicas of one model, round-robin scatters consecutive turns of a
 conversation, so vLLM's prefix cache rarely gets reused. Agent traffic resends a long
@@ -247,272 +204,190 @@ system prompt and tool definitions every turn, so most of each prompt is shared.
 
 Kiln hashes each prompt into cumulative leading blocks and scores replicas by how much
 of that prefix they already hold, minus a penalty for how busy they are. Four
-strategies: `round-robin`, `least-loaded`, `prefix-aware`, and `prefix-aware+load`.
-Pure affinity sends every request for a popular prefix to one replica, which is why
-the load-penalised variant exists.
+strategies, selected with `-router`: `round-robin`, `least-loaded`, `prefix-aware`,
+`prefix-aware+load`. Pure affinity sends every request for a popular prefix to one
+replica, which is why the load-penalised variant exists.
 
-## Results
+Replaying the same recorded agent trace against two replicas of one model:
 
-Measured on an RTX 3070 Laptop (8 GB) under WSL2, vLLM 0.32.0, eager mode. Raw
-per-request output and the conditions for each run are in
-[`docs/results/`](docs/results). The figures are generated from those files by
-`python scripts/make_figures.py`.
+| Router | Requests | p50 TTFT | Spread across replicas |
+|---|---|---|---|
+| `round-robin` | 81 | 1029 ms | 41 / 40 |
+| `least-loaded` | 28 | 96 ms | 20 / 8 |
 
-### Waking a model vs loading it from scratch
+An even spread is not automatically better — affinity concentrates a conversation on
+one replica on purpose, to reuse its KV cache. Run it with `make bench EXP=5`.
 
-![Wake versus cold start](docs/img/results-wake-vs-cold.svg)
-
-| Model | Resident VRAM | Cold start | Wake from CPU RAM | Wake from disk |
-|---|---|---|---|---|
-| Qwen2.5-0.5B | 2458 MiB | 35.3 s | 0.59 s (59.7×) | 0.71 s (50.0×) |
-| Qwen3-0.6B | 2621 MiB | 35.9 s | 0.82 s (43.7×) | 1.05 s (34.3×) |
-| Qwen2.5-1.5B | 4506 MiB | 37.4 s | 1.54 s (24.3×) | 1.81 s (20.6×) |
-
-Sleeping frees 92% of a model's resident VRAM and the woken model produces identical
-output. Cold start barely changes with model size because it is dominated by process
-spawn, CUDA initialisation and memory profiling rather than by reading weights.
-
-Reproduce with `make m0` and `make bench EXP=2`.
-
-### Platform
+## Other measured behaviour
 
 | | |
 |---|---|
 | Deploy to `READY`, one API call | 46 s |
 | Streaming time-to-first-token vs total | 0.071 s vs 1.107 s |
-| Quota enforcement, 3 rpm team | `200 200 200 429 429 429`, `Retry-After: 19` |
-| Quota enforcement, 600 rpm team | six 200s, unaffected by the other tenant |
-| Deploy job survives `SIGKILL` of its worker | reclaimed and finished after 2 attempts |
+| Quota, 3 rpm team | `200 200 200 429 429 429`, `Retry-After: 19` |
+| Quota, 600 rpm team | six 200s, unaffected by the other tenant |
+| Deploy job survives `SIGKILL` of its worker | reclaimed from its lease, done after 2 attempts |
 
-Reproduce with `make m1` and `make m2`.
+`make m1` and `make m2` reproduce these. Raw output is in
+[`docs/results/`](docs/results).
 
-### Routing
+## Why the node agent owns the GPU
 
-![Router comparison](docs/img/results-routing.svg)
+Kubernetes gives a pod exclusive use of a GPU for the pod's whole lifetime, with no
+way to release it and keep running. One Deployment per model would therefore pin one
+model to each GPU permanently, and tiering would be impossible to express. So a single
+long-lived agent holds the GPU and runs vLLM as child processes, starting, sleeping,
+waking and stopping them underneath itself. The same binary runs standalone under
+Docker with no Kubernetes at all.
 
-Run with `make bench EXP=5`. Every arm replays the same recorded trace from
-`bench/traces/`, so the only variable is the router.
+Deployment jobs are claimed with `SELECT ... FOR UPDATE SKIP LOCKED` so several
+control planes can drain one queue without blocking each other, plus a lease, because
+the row lock dies with its transaction while a deploy takes minutes. A crashed
+worker's lease expires and another worker picks the job up.
 
-The eviction policy comparison is not included. It needs sustained memory pressure,
-and on an 8 GB card that means running at the edge of the device, where swap
-operations contend with inference and a wake measured at 0.59 s idle took 81 s under
-load. The tiering mechanism above is measured; which policy wins under load needs a
-GPU with headroom. See [`docs/PROGRESS.md`](docs/PROGRESS.md).
+[`docs/DESIGN.md`](docs/DESIGN.md) goes into the rest, including where the OS
+memory-hierarchy analogy stops holding.
 
-## HTTP API
+## API
 
-Inference routes need `Authorization: Bearer <api key>`.
+Inference routes take `Authorization: Bearer <api key>`:
 
-| Method | Path | Purpose |
-|---|---|---|
-| `POST` | `/v1/chat/completions` | OpenAI-compatible chat, `stream: true` supported |
-| `POST` | `/v1/completions` | OpenAI-compatible legacy completions |
-| `GET` | `/v1/models` | Deployed models, state, ready replica count |
-| `GET` | `/health` | Liveness. No auth. |
-| `GET` | `/metrics` | Prometheus metrics. No auth. |
+```
+POST /v1/chat/completions     OpenAI-compatible, stream: true supported
+POST /v1/completions          OpenAI-compatible legacy completions
+GET  /v1/models               deployed models, state, ready replica count
+GET  /health                  no auth
+GET  /metrics                 Prometheus, no auth
+```
 
-Admin routes need `Authorization: Bearer <admin token>`.
+Admin routes take `Authorization: Bearer <admin token>`:
 
-| Method | Path | Purpose |
-|---|---|---|
-| `POST` | `/admin/models` | Deploy a model. Returns a job. |
-| `GET` | `/admin/models` | List deployments |
-| `GET` | `/admin/models/{id}` | One deployment, its replicas and live job |
-| `DELETE` | `/admin/models/{id}` | Tear a deployment down through a job |
-| `POST` | `/admin/models/{id}/scale` | Change replica count |
-| `POST` | `/admin/models/{id}/pin` | Pin a model so it is never evicted |
-| `POST` | `/admin/teams` | Create a team with its quota |
-| `GET` | `/admin/teams` | List teams and quotas |
-| `POST` | `/admin/teams/{id}/keys` | Mint an API key. Shown once. |
-| `DELETE` | `/admin/keys/{id}` | Revoke a key |
-| `GET` | `/admin/jobs` | Recent deployment jobs |
-| `GET` | `/admin/usage?since=24h` | Token usage per team and model |
+```
+POST   /admin/models              deploy a model, returns a job
+GET    /admin/models              list deployments
+GET    /admin/models/{id}         one deployment, its replicas and live job
+DELETE /admin/models/{id}         tear down through a job
+POST   /admin/models/{id}/scale   change replica count
+POST   /admin/models/{id}/pin     pin so it is never evicted
+POST   /admin/teams               create a team with its quota
+POST   /admin/teams/{id}/keys     mint an API key, shown once
+DELETE /admin/keys/{id}           revoke a key
+GET    /admin/jobs                recent deployment jobs
+GET    /admin/usage?since=24h     token usage per team and model
+```
 
-Node agent routes are internal, one agent per GPU.
+The node agent's own API is internal: `/status`, `POST /replicas`,
+`/replicas/{id}/sleep`, `/replicas/{id}/wake`, `DELETE /replicas/{id}`.
 
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/status` | GPUs, host memory, and every replica on this node |
-| `POST` | `/replicas` | Start a replica. Idempotent. |
-| `POST` | `/replicas/{id}/sleep` | Sleep to CPU RAM (`level: 1`) or disk (`level: 2`) |
-| `POST` | `/replicas/{id}/wake` | Wake, including the weight reload a level-2 wake needs |
-| `DELETE` | `/replicas/{id}` | Stop the process and release its GPU memory |
+## Make targets
+
+| Target | Purpose |
+|---|---|
+| `make setup` | Installs vLLM, the Go toolchain and PostgreSQL |
+| `make build` | Builds the three binaries |
+| `make db` | Starts PostgreSQL and applies migrations |
+| `make test` | Unit tests — no GPU, database or network |
+| `make test-all` | Adds the PostgreSQL integration suites |
+| `make m0` / `m1` / `m2` | The end-to-end checks described above |
+| `make cluster` / `up` / `down` | Local Kubernetes |
+| `make traces` / `bench EXP=n` | Benchmarks |
 
 ## Monitoring
 
-The gateway and node agent expose Prometheus metrics.
-[`dashboards/kiln.json`](dashboards/kiln.json) is a Grafana dashboard with four rows:
-client latency, GPU and host memory, scheduler activity, and routing.
+Both the gateway and the node agent expose Prometheus metrics, and
+[`dashboards/kiln.json`](dashboards/kiln.json) is a Grafana dashboard in four rows:
+client latency, GPU and host memory, scheduler activity, routing.
 
-| Metric | Meaning |
-|---|---|
-| `kiln_ttft_seconds` | Time to first token, by model, team and replica |
-| `kiln_requests_total` | Requests by status class |
-| `kiln_tokens_total` | Prompt and completion tokens, by team |
-| `kiln_queue_depth`, `kiln_queue_wait_seconds` | Saturation, and where a wake appears to a client |
-| `kiln_quota_rejections_total` | 429s, labelled by which limit was hit |
-| `kiln_gpu_memory_bytes`, `kiln_host_memory_bytes` | Device and host memory |
-| `kiln_models_by_state` | How many models are resident, asleep, or loading |
-| `kiln_swap_duration_seconds` | Transition cost, labelled from-tier and to-tier |
-| `kiln_evictions_total`, `kiln_wakes_total`, `kiln_cold_starts_total` | Swap activity |
-| `kiln_residency_hits_total`, `kiln_residency_misses_total` | How often a model was already loaded |
-| `kiln_thrash_total` | Evictions inside the minimum residency window. Should be zero. |
+Beyond the usual latency and throughput series, the ones worth watching are
+`kiln_swap_duration_seconds` (labelled from-tier and to-tier),
+`kiln_residency_hits_total` against `kiln_residency_misses_total` for how often a
+request found its model already loaded, and `kiln_thrash_total`, which counts
+evictions inside the minimum residency window and should always be zero.
 
-After `make up`, Grafana is on port 30300 (`admin` / `admin`) and Prometheus on 30090.
-
-## Kubernetes Model
-
-| Object | Kind | Purpose |
-|---|---|---|
-| `kiln-nodeagent` | DaemonSet | One per GPU node. The only pod that requests `nvidia.com/gpu`. |
-| `kiln-gateway` | Deployment, 2 replicas | Stateless request path |
-| `kiln-controlplane` | Deployment, 2 replicas | Two on purpose; the job queue is built for it |
-| `kiln-postgres` | StatefulSet | Keys and usage outlive a pod restart |
-| `kiln-hf-cache` | PVC | Shared weight cache, which makes a disk-tier wake cheap |
-| `prometheus`, `grafana` | Deployments | Monitoring |
-
-The node agent has no liveness probe and a 180 second termination grace period. A cold
-start can block long enough to look dead to a prober, and restarting mid-load orphans a
-vLLM process that still holds the GPU. `/dev/shm` is mounted as an 8 GiB memory-backed
-volume, because vLLM's engine core talks to its workers over shared memory and the
-Docker default of 64 MB causes a bus error during startup.
+After `make up`, Grafana is on port 30300 (`admin`/`admin`), Prometheus on 30090.
 
 ## Tests
 
 ```bash
-make test      # unit tests: no GPU, database or network
-make test-all  # adds the PostgreSQL integration suites
+make test      # unit tests, offline
+make test-all  # adds the PostgreSQL suites
 ```
 
-The default suite is offline and GPU-free. The scheduler and routers are written as
-pure functions, so their logic is covered without hardware. The PostgreSQL suites skip
+The default suite needs no GPU, database or network, because a suite that needs a GPU
+stops being run. The scheduler and routers are written as pure functions — state in,
+decisions out — so their logic is covered without hardware. The PostgreSQL suites skip
 unless `KILN_TEST_DATABASE_URL` is set, and each migrates into its own schema so
-packages can run in parallel.
+packages can run in parallel without truncating each other's tables.
 
 ## Troubleshooting
 
-### `cudaGetDeviceCount() Error 500: named symbol not found` inside a pod
+**`cudaGetDeviceCount() Error 500: named symbol not found` in a pod.** GPU passthrough
+is not reaching the container. Under WSL2 there is no `/dev/nvidia*` at all — the GPU
+is paravirtualised through `/dev/dxg` and the libraries in `/usr/lib/wsl/lib`, which
+minikube's node image does not pass into pods. `nvidia-smi` still works inside the pod,
+which makes this look like a CUDA version mismatch instead. Run the node agent on the
+host; the Kubernetes GPU path works on a normal Linux node.
 
-GPU passthrough is not reaching the container. Under WSL2 there is no `/dev/nvidia*`;
-the GPU is paravirtualised through `/dev/dxg` and the libraries in `/usr/lib/wsl/lib`,
-which minikube's node image does not pass into pods. `nvidia-smi` still works inside
-the pod, which makes this look like a CUDA version mismatch. Run the node agent
-directly on the host instead. The Kubernetes GPU path works on a normal Linux node.
+**`No available memory for the cache blocks`.** `gpu_memory_utilization` is too low. It
+caps the weights and the KV cache arena together, so a 1.5B model in bf16 needs about
+0.55 of an 8 GB card, not 0.4.
 
-### `No available memory for the cache blocks`
+**A model stays in `STARTING`.** Check the per-replica vLLM log — the path is in the
+error message. A gated Hugging Face repo is the usual cause; `meta-llama/*` returns 403
+without a token.
 
-`gpu_memory_utilization` is too low. It caps the weights and the KV cache arena
-together, so a 1.5B model in bf16 needs about 0.55 of an 8 GB card, not 0.4.
+**GPU memory full but nothing deployed.** An interrupted run left orphaned vLLM
+processes. They are spawned into their own process group so the agent can signal the
+whole tree, but if the agent is killed abruptly they survive holding their allocation.
+Run `bash scripts/gpu_reclaim.sh`.
 
-### `OSError: [Errno 98] Address already in use` when a model restarts
+**503 `model_unavailable`.** The gateway logs the reason: usually the model is not
+deployed, every eviction candidate is inside its minimum residency window, or the model
+is larger than the whole VRAM budget.
 
-The previous process has not released its port. Kiln takes a fresh port when
-respawning a replica, so this means something outside Kiln is holding it.
-
-### A model stays in `STARTING`
-
-Check the per-replica vLLM log; its path is in the error message. A gated Hugging Face
-repo is the usual cause, since `meta-llama/*` returns 403 without a token. Set
-`HF_TOKEN` or use an openly licensed model.
-
-### GPU memory is full but nothing is deployed
-
-An interrupted run left orphaned vLLM processes:
-
-```bash
-bash scripts/gpu_reclaim.sh
-```
-
-### Requests return 503 with `model_unavailable`
-
-The gateway logs the reason. Usually the model is not deployed, every eviction
-candidate is inside its minimum residency window, or the model is larger than the whole
-VRAM budget.
-
-### Shell scripts fail with odd syntax errors on Windows
-
-Line endings. The repo sets `* text eol=lf` in `.gitattributes`. A script checked out
-with CRLF makes bash read a trailing `\r` on every line.
+**Shell scripts failing with `set: pipefail: invalid option name` on Windows.** Line
+endings. The repo sets `* text eol=lf`; a script checked out with CRLF makes bash read
+a trailing `\r` on every line.
 
 ## Configuration
 
-Gateway:
+The gateway takes `-agents`, `-database-url`, `-router`, `-policy`, `-gpu-bytes`,
+`-gpu-reserve-bytes`, `-min-residency`, `-drain-deadline`, `-max-queue` and
+`-queue-timeout`. Without `-database-url` it runs open, with no auth, quotas or
+tiering, which is useful for benchmarking. Without `-policy` tiering is off.
 
-| Flag / env | Default | Purpose |
-|---|---|---|
-| `-addr` / `KILN_GATEWAY_ADDR` | `:8080` | Listen address |
-| `-agents` / `KILN_AGENTS` | `http://127.0.0.1:8081` | Node agent URLs, comma-separated |
-| `-database-url` / `KILN_DATABASE_URL` | — | Postgres DSN. Empty disables auth, quotas and tiering. |
-| `-router` / `KILN_ROUTER` | `round-robin` | `round-robin`, `least-loaded`, `prefix-aware`, `prefix-aware+load` |
-| `-policy` / `KILN_POLICY` | — | Eviction policy. Empty disables tiering. |
-| `-gpu-bytes` | 8 GiB | Device VRAM the scheduler budgets against |
-| `-gpu-reserve-bytes` | 256 MiB | Margin for allocator fragmentation |
-| `-min-residency` | `15s` | How long a model must serve before it can be evicted |
-| `-drain-deadline` | `10s` | How long to wait for in-flight requests before sleeping a model |
-| `-max-queue` | 256 | Per-model queue depth before shedding load |
-| `-queue-timeout` | `180s` | How long a request waits for its model to become servable |
+The control plane takes `-database-url` (required), `-admin-token` (empty disables the
+admin API), `-workers` and `-measure-wakes`.
 
-Control plane:
+The node agent takes `-python`, `-advertise-host` (the pod IP under Kubernetes, since
+replicas are advertised to other pods), `-hf-home` and `-start-timeout`.
 
-| Flag / env | Default | Purpose |
-|---|---|---|
-| `-addr` / `KILN_CP_ADDR` | `:8082` | Listen address |
-| `-database-url` / `KILN_DATABASE_URL` | — | Postgres DSN. Required. |
-| `-admin-token` / `KILN_ADMIN_TOKEN` | — | Shared admin token. Empty disables the admin API. |
-| `-workers` | 2 | Deployment job workers in this process |
-| `-measure-wakes` | `true` | Measure sleep and wake costs at deploy time |
+Each flag has a `KILN_`-prefixed environment variable; run any binary with `-h` for
+the full list and defaults.
 
-Node agent:
-
-| Flag / env | Default | Purpose |
-|---|---|---|
-| `-addr` / `KILN_AGENT_ADDR` | `:8081` | Listen address |
-| `-python` / `KILN_PYTHON` | `python` | Interpreter that has vLLM installed |
-| `-advertise-host` / `KILN_ADVERTISE_HOST` | `127.0.0.1` | Host others use to reach replicas. The pod IP under Kubernetes. |
-| `-hf-home` / `HF_HOME` | — | Shared weight cache |
-| `-start-timeout` | `15m` | How long a cold start may take |
-
-## Repository Layout
+## Layout
 
 ```
-cmd/
-  gateway/           OpenAI-compatible API, auth, quotas, routing, residency
-  controlplane/      Admin API and deployment job workers
-  nodeagent/         Owns one GPU, supervises vLLM processes
+cmd/          gateway, controlplane, nodeagent
 internal/
-  api/               HTTP handlers, SSE proxy, admin API, middleware
-  auth/              Hashed API keys, token-bucket quotas
-  routing/           Four routers, cumulative prefix hashing
-  scheduler/         State machine, VRAM accounting, five eviction policies
-  swap/              The tiering executor: drain, evict, wake
-  jobs/              Deployment workers using SKIP LOCKED and leases
-  nodeagent/         vLLM process supervision, sleep and wake, GPU probe
-  store/             PostgreSQL via pgx, embedded migrations
-  metrics/           Prometheus instrumentation
-bench/               Trace generator, Locust harness, experiment runner
-deploy/
-  k8s/               Manifests for the stack and monitoring
-  docker/            Dockerfiles
-dashboards/          Grafana dashboard JSON
-docs/
-  DESIGN.md          Why it is built this way and where the tradeoffs are
-  PROGRESS.md        What was measured, and the bugs found measuring it
-  results/           Raw benchmark output and run conditions
-scripts/             Setup, end-to-end tests, figure generation
+  api/        HTTP handlers, SSE proxy, admin API, middleware
+  auth/       hashed API keys, token-bucket quotas
+  routing/    four routers, cumulative prefix hashing
+  scheduler/  state machine, VRAM accounting, five eviction policies
+  swap/       the tiering executor: drain, evict, wake
+  jobs/       deployment workers, SKIP LOCKED + leases
+  nodeagent/  vLLM process supervision, sleep/wake, GPU probe
+  store/      PostgreSQL via pgx, embedded migrations
+bench/        trace generator, Locust harness, experiment runner
+deploy/       Kubernetes manifests, Dockerfiles
+docs/         DESIGN.md, PROGRESS.md, raw results
 ```
 
-## Notes And Limits
+## Limits
 
-- A single GPU is the tested configuration. Placement across nodes sorts agents by
-  free VRAM.
-- Host RAM is the real ceiling on the CPU-RAM tier. VRAM decides how many models can
-  be active; host RAM decides how many can be kept warm.
-- The Kubernetes GPU path is untested on WSL2, for the reason under Troubleshooting.
-  Every component comes up; GPU workloads need a normal Linux node.
-- The eviction policy comparison is not claimed, for the reason under Results.
-- The admin API uses a single shared token and is meant to be reachable only from
-  inside the cluster.
-
-[`docs/DESIGN.md`](docs/DESIGN.md) covers the design argument and the tradeoffs.
-[`docs/PROGRESS.md`](docs/PROGRESS.md) covers what was measured and the bugs that
-measuring it exposed.
+A single GPU is the tested configuration; cross-node placement just sorts agents by
+free VRAM. Host RAM is the real ceiling on the CPU-RAM tier, since VRAM decides how
+many models can be active but host RAM decides how many stay warm. The Kubernetes GPU
+path is untested on WSL2 for the reason above — every component comes up, but GPU
+workloads need a normal Linux node. The admin API uses one shared token and is meant
+to be reachable only from inside the cluster.
