@@ -1,0 +1,4 @@
+model,vram_mib,cold_start_s,wake_l1_s,wake_l2_s,l1_speedup_vs_cold,l2_speedup_vs_cold
+qwen-0.5b,2458,35.33,0.592,0.706,59.7,50.0
+qwen3-0.6b,2621,35.94,0.823,1.047,43.7,34.3
+qwen-1.5b,4506,37.37,1.54,1.813,24.3,20.6

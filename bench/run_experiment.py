@@ -29,10 +29,10 @@ import os
 import pathlib
 import signal
 import socket
-import statistics
 import subprocess
 import sys
 import time
+from urllib.parse import quote
 
 import requests
 
@@ -256,6 +256,27 @@ class Bench:
             time.sleep(3)
         raise TimeoutError(f"{model_id} never became READY")
 
+    def sleep_model(self, model_id: str, level: int = 2) -> None:
+        """Park a model in a sleep tier via the node agent.
+
+        Setup needs this because the deploy path leaves every model ACTIVE, and the
+        whole point of experiment 3 is a fleet that does not fit in VRAM at once.
+        Deploying the second model while the first is still resident would simply
+        fail with "no available memory for the cache blocks" -- so each model is slept
+        immediately after it is measured, and the scheduler pages them back in on
+        demand once the trace starts.
+        """
+        reps = self.admin("GET", f"/admin/models/{model_id}").json().get("replicas") or []
+        for r in reps:
+            requests.post(
+                f"http://127.0.0.1:{self.agent_port}/replicas/{quote(r['id'], safe='')}/sleep",
+                json={"level": level, "mode": "wait"}, timeout=600).raise_for_status()
+
+    def gpu_free_mib(self) -> int:
+        st = requests.get(f"http://127.0.0.1:{self.agent_port}/status", timeout=30).json()
+        gpus = st.get("gpus") or []
+        return round(gpus[0]["free_bytes"] / 2**20) if gpus else 0
+
     def gateway(self, *, router: str = "round-robin", policy: str = "",
                 extra: list[str] | None = None) -> tuple[Service, str]:
         port = free_port()
@@ -348,8 +369,21 @@ def experiment_3(b: Bench) -> None:
     b.start_platform()
     rows = []
     try:
+        # Deploy each model, then immediately put it to sleep. The fleet is chosen to
+        # exceed VRAM on purpose -- that is the condition the whole feature exists for
+        # -- so they cannot all be resident at once, and deploying the second while
+        # the first is still active would just fail to allocate a KV cache.
+        total_mib = 0
         for model_id, repo, util in b.args.model_set:
-            b.deploy(model_id, repo, gpu_util=util)
+            st = b.deploy(model_id, repo, gpu_util=util)
+            total_mib += round(st["footprint_vram_bytes"] / 2**20)
+            b.sleep_model(model_id, level=2)
+            print(f"      slept {model_id}; GPU free: {b.gpu_free_mib()} MiB")
+
+        budget_mib = round((b.args.gpu_bytes - b.args.gpu_reserve_bytes) / 2**20)
+        print(f"\n  fleet wants {total_mib} MiB, budget is {budget_mib} MiB "
+              f"({'OVERSUBSCRIBED -- good' if total_mib > budget_mib else 'FITS -- no pressure, results will be uninformative'})")
+        rows_meta = {"fleet_mib": total_mib, "budget_mib": budget_mib}
 
         for trace in traces:
             for policy in b.args.policies.split(","):
@@ -376,6 +410,7 @@ def experiment_3(b: Bench) -> None:
                         "drain_timeouts": int(counter_total(m, "kiln_drain_timeouts_total")),
                         "residency_hit_ratio": round(hits / (hits + misses), 3) if hits + misses else 0.0,
                     })
+                    s.update(rows_meta)
                     rows.append(s)
                     print(f"     p50 {s['ttft_p50_ms']}ms  p95 {s['ttft_p95_ms']}ms  "
                           f"p99 {s['ttft_p99_ms']}ms  hit {s['residency_hit_ratio']}  "
@@ -383,9 +418,14 @@ def experiment_3(b: Bench) -> None:
                 finally:
                     svc.stop()
                     b.services.remove(svc)
-                    # Let the GPU settle between arms so one arm's leftover residency
-                    # does not warm-start the next and flatter it.
-                    time.sleep(8)
+                    # Reset the fleet to all-asleep between arms. Without this the
+                    # next policy starts with whatever the previous one happened to
+                    # leave resident, which silently advantages whichever arm runs
+                    # after the one with the best hit ratio.
+                    for model_id, _, _ in b.args.model_set:
+                        with contextlib.suppress(Exception):
+                            b.sleep_model(model_id, level=2)
+                    time.sleep(5)
     finally:
         b.stop_all()
 
@@ -514,7 +554,12 @@ def main() -> int:
         args.model_set = [
             ("qwen-0.5b", "Qwen/Qwen2.5-0.5B-Instruct", 0.30),
             ("qwen3-0.6b", "Qwen/Qwen3-0.6B", 0.32),
-            ("qwen-1.5b", "Qwen/Qwen2.5-1.5B-Instruct", 0.42),
+            # 0.55, not 0.42: a 1.5B in bf16 is ~3.1 GB of weights, and
+            # gpu_memory_utilization is the ceiling for weights *plus* the KV cache
+            # arena. At 0.42 of an 8 GB card vLLM reports "Available KV cache memory:
+            # -0.04 GiB" and refuses to start. That it needs over half the device is
+            # the memory pressure this project exists to manage.
+            ("qwen-1.5b", "Qwen/Qwen2.5-1.5B-Instruct", 0.55),
         ]
 
     RESULTS.mkdir(parents=True, exist_ok=True)

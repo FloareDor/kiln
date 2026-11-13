@@ -1,0 +1,30 @@
+{
+  "experiment": 2,
+  "when": "2026-11-13 06:41:58",
+  "duration": "5m",
+  "users": 8,
+  "policies": "cold,lru,lfu-decay,cost-aware,predictive-prewarm",
+  "routers": "round-robin,least-loaded,prefix-aware,prefix-aware+load",
+  "traces": "zipf_s10,bursty",
+  "models": [
+    [
+      "qwen-0.5b",
+      "Qwen/Qwen2.5-0.5B-Instruct",
+      0.3
+    ],
+    [
+      "qwen3-0.6b",
+      "Qwen/Qwen3-0.6B",
+      0.32
+    ],
+    [
+      "qwen-1.5b",
+      "Qwen/Qwen2.5-1.5B-Instruct",
+      0.55
+    ]
+  ],
+  "gpu_bytes": 8589934592,
+  "gpu_reserve_bytes": 1073741824,
+  "min_residency": "15s",
+  "drain_deadline": "10s"
+}

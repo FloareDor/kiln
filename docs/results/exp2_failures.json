@@ -1,0 +1,6 @@
+[
+  {
+    "model": "qwen-1.5b",
+    "error": "deploy of qwen-1.5b failed: start qwen-1.5b--0 on http://127.0.0.1:45685: agentclient POST /replicas: 500 Internal Server Error: {\"error\":\"nodeagent: vllm exited during startup (exit status 1: RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}); see /tmp/kiln-logs/qwen-1.5b--0.log\",\"replica\":{\"spec\":{\"replica\":\"qwen-1.5b--0\",\"model\":\"qwen-1.5b\",\"hf_repo\":\"Qwen/Qwen2.5-1.5B-Instruct\",\"gpu_memory_utilization\":0.42,\"max_model_len\":2048,\"enforce_eager\":tru"
+  }
+]
