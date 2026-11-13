@@ -1,0 +1,10 @@
+.env
+bin/
+*.log
+__pycache__/
+.venv/
+venv/
+docs/results/raw/*.jsonl
+node_modules/
+.DS_Store
+hf-cache/

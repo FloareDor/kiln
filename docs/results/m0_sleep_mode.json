@@ -1,0 +1,109 @@
+{
+  "vllm_version": "0.32.0",
+  "torch_version": "2.13.0+cu130",
+  "gpu": "NVIDIA GeForce RTX 3070 Laptop GPU",
+  "gpu_total_mib": 8192,
+  "idle_baseline_mib": 1318,
+  "per_process_nvml": false,
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "gpu_memory_utilization": 0.35,
+  "max_model_len": 2048,
+  "samples": [
+    {
+      "label": "baseline (no server)",
+      "device_used_mib": 1318,
+      "vllm_mib": 0,
+      "proc_used_mib": 0,
+      "elapsed_s": 0.0,
+      "note": ""
+    },
+    {
+      "label": "ACTIVE (cold start)",
+      "device_used_mib": 4244,
+      "vllm_mib": 2926,
+      "proc_used_mib": 0,
+      "elapsed_s": 38.9,
+      "note": "ref=' Paris. It was founded in 789 AD by'"
+    },
+    {
+      "label": "SLEEPING_L1",
+      "device_used_mib": 1549,
+      "vllm_mib": 231,
+      "proc_used_mib": 0,
+      "elapsed_s": 1.47,
+      "note": "is_sleeping=True"
+    },
+    {
+      "label": "ACTIVE (woke from L1)",
+      "device_used_mib": 4245,
+      "vllm_mib": 2927,
+      "proc_used_mib": 0,
+      "elapsed_s": 0.88,
+      "note": "out=' Paris. It was founded in 789 AD by' OK"
+    },
+    {
+      "label": "SLEEPING_L2",
+      "device_used_mib": 1549,
+      "vllm_mib": 231,
+      "proc_used_mib": 0,
+      "elapsed_s": 0.05,
+      "note": "is_sleeping=True"
+    },
+    {
+      "label": "ACTIVE (L2 wake, no reload)",
+      "device_used_mib": 4245,
+      "vllm_mib": 2927,
+      "proc_used_mib": 0,
+      "elapsed_s": 0.45,
+      "note": "out='!!!!!!!!!!!!' GARBAGE (expected)"
+    },
+    {
+      "label": "ACTIVE (L2 wake + reload)",
+      "device_used_mib": 4505,
+      "vllm_mib": 3187,
+      "proc_used_mib": 0,
+      "elapsed_s": 1.87,
+      "note": "out=' Paris. It was founded in 789 AD by' OK"
+    },
+    {
+      "label": "after shutdown",
+      "device_used_mib": 1318,
+      "vllm_mib": 0,
+      "proc_used_mib": 0,
+      "elapsed_s": 0.0,
+      "note": ""
+    },
+    {
+      "label": "ACTIVE (2nd cold start)",
+      "device_used_mib": 4244,
+      "vllm_mib": 2926,
+      "proc_used_mib": 0,
+      "elapsed_s": 34.34,
+      "note": "warm page cache"
+    }
+  ],
+  "verdict": {
+    "measurement": "device-wide minus idle baseline",
+    "resident_mib": 2926,
+    "freed_by_l1_mib": 2695,
+    "freed_by_l2_mib": 2695,
+    "freed_by_l1_pct": 92.1,
+    "freed_by_l2_pct": 92.1,
+    "cold_start_s": 38.9,
+    "cold_start_warm_cache_s": 34.34,
+    "sleep_l1_s": 1.47,
+    "wake_l1_s": 0.88,
+    "sleep_l2_s": 0.05,
+    "wake_l2_naive_s": 0.45,
+    "wake_l2_with_reload_s": 1.87,
+    "speedup_l1_vs_cold": 39.02,
+    "speedup_l2_vs_cold": 18.36,
+    "checks": {
+      "l1_output_matches": true,
+      "l2_naive_output_matches": false,
+      "l2_reload_output_matches": true
+    },
+    "reference_output": " Paris. It was founded in 789 AD by",
+    "PASS": true
+  }
+}
