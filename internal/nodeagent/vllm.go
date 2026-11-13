@@ -219,7 +219,7 @@ func (r *Replica) args() []string {
 		// replica gets it, because a model that cannot be slept cannot be tiered and
 		// would have to be killed instead.
 		"--enable-sleep-mode",
-		"--gpu-memory-utilization", strconv.FormatFloat(r.spec.GPUMemoryUtilization, 'f', 3, 64),
+		"--gpu-memory-utilization", strconv.FormatFloat(r.effectiveGPUUtil(), 'f', 3, 64),
 		// 0.32.0 removed --disable-log-requests in favour of this negated pair.
 		"--no-enable-log-requests",
 	}
@@ -236,6 +236,42 @@ func (r *Replica) args() []string {
 		a = append(a, "--no-enable-prefix-caching")
 	}
 	return append(a, r.spec.ExtraArgs...)
+}
+
+// effectiveGPUUtil converts the requested share of the device into the number vLLM
+// actually wants.
+//
+// vLLM treats --gpu-memory-utilization as a ceiling on *device-wide* usage, not as
+// this process's own allowance: it computes the KV cache budget as
+// total * utilization - (memory already in use on the device). So the value that
+// works for the first replica on an idle GPU fails for the second, because the
+// first's allocation now counts against the ceiling. Two replicas at 0.26 each do
+// not use 52% of the card -- the second one fails to allocate a KV cache at all,
+// with "No available memory for the cache blocks".
+//
+// Spec.GPUMemoryUtilization therefore means "the share of the device this replica
+// should get", which is what an operator expects, and this adds whatever is already
+// resident to produce the ceiling vLLM is asking for.
+func (r *Replica) effectiveGPUUtil() float64 {
+	want := r.spec.GPUMemoryUtilization
+	if want <= 0 {
+		want = 0.35
+	}
+	infos, err := nvidiaSMI(context.Background())
+	if err != nil || len(infos) == 0 || infos[0].TotalBytes == 0 {
+		// No reading: fall back to the requested value. Being wrong in the
+		// conservative direction costs a failed start, which is loud; silently
+		// over-allocating would corrupt a neighbouring replica, which is not.
+		return want
+	}
+	inUse := float64(infos[0].UsedBytes) / float64(infos[0].TotalBytes)
+	eff := want + inUse
+	// vLLM rejects >= 1.0, and leaving no headroom at all means the allocator has
+	// nowhere to grow during graph capture.
+	if eff > 0.95 {
+		eff = 0.95
+	}
+	return eff
 }
 
 func (r *Replica) env() []string {

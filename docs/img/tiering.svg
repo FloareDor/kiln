@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 430" width="960" height="430" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <title>How GPU memory tiering works</title>
+  <desc>A model moves between four places: resident in GPU VRAM, parked in CPU RAM, dropped to disk, or not loaded. Waking from CPU RAM takes 0.59 seconds and from disk 0.71 seconds, against 35 seconds to load from scratch.</desc>
+  <defs>
+    <marker id="t-ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#c2410c"/>
+    </marker>
+    <marker id="t-ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#94a3b8"/>
+    </marker>
+    <style>
+      .card  { fill:#ffffff; stroke:#cbd5e1; stroke-width:1.5; rx:12; }
+      .hot   { fill:#fff7ed; stroke:#fb923c; stroke-width:2.5; rx:12; }
+      .warm  { fill:#eff6ff; stroke:#93c5fd; stroke-width:2; rx:12; }
+      .cold  { fill:#f8fafc; stroke:#cbd5e1; stroke-width:1.5; rx:12; }
+      .h     { font-size:17px; font-weight:700; fill:#0f172a; }
+      .sub   { font-size:12.5px; fill:#475569; }
+      .tiny  { font-size:11px; fill:#64748b; }
+      .cost  { font-size:21px; font-weight:700; fill:#c2410c; }
+      .costc { font-size:21px; font-weight:700; fill:#64748b; }
+      .lbl   { font-size:12px; fill:#c2410c; font-weight:600; }
+      .title { font-size:14px; font-weight:700; fill:#0f172a; letter-spacing:.04em; }
+      @media (prefers-color-scheme: dark) {
+        .card{fill:#1e293b;stroke:#475569;} .hot{fill:#2a1a0e;stroke:#ea580c;}
+        .warm{fill:#132338;stroke:#3b82f6;} .cold{fill:#172033;stroke:#475569;}
+        .h,.title{fill:#f1f5f9;} .sub{fill:#cbd5e1;} .tiny{fill:#94a3b8;}
+        .cost{fill:#fb923c;} .lbl{fill:#fb923c;} .costc{fill:#94a3b8;}
+      }
+    </style>
+  </defs>
+
+  <text class="title" x="24" y="28">WHERE A MODEL CAN LIVE, AND WHAT IT COSTS TO BRING IT BACK</text>
+
+  <!-- GPU VRAM -->
+  <rect class="hot" x="24" y="52" width="216" height="150"/>
+  <text class="h"    x="44" y="82">GPU VRAM</text>
+  <text class="sub"  x="44" y="104">Serving right now.</text>
+  <text class="tiny" x="44" y="126">Like a page resident in RAM.</text>
+  <text class="cost" x="44" y="168">0 s</text>
+  <text class="tiny" x="44" y="188">already there</text>
+
+  <!-- CPU RAM -->
+  <rect class="warm" x="264" y="52" width="216" height="150"/>
+  <text class="h"    x="284" y="82">CPU RAM</text>
+  <text class="sub"  x="284" y="104">Weights copied to host memory.</text>
+  <text class="tiny" x="284" y="126">Like a page swapped to disk.</text>
+  <text class="cost" x="284" y="168">0.59 s</text>
+  <text class="tiny" x="284" y="188">vLLM sleep level 1</text>
+
+  <!-- Disk -->
+  <rect class="card" x="504" y="52" width="216" height="150"/>
+  <text class="h"    x="524" y="82">Disk</text>
+  <text class="sub"  x="524" y="104">Weights dropped, process alive.</text>
+  <text class="tiny" x="524" y="126">Like a page file.</text>
+  <text class="cost" x="524" y="168">0.71 s</text>
+  <text class="tiny" x="524" y="188">level 2 + weight reload</text>
+
+  <!-- Not loaded -->
+  <rect class="cold" x="744" y="52" width="192" height="150"/>
+  <text class="h"     x="764" y="82">Not loaded</text>
+  <text class="sub"   x="764" y="104">No process at all.</text>
+  <text class="tiny"  x="764" y="126">Start from scratch.</text>
+  <text class="costc" x="764" y="168">35 s</text>
+  <text class="tiny"  x="764" y="188">spawn, load, profile</text>
+
+  <!-- wake arrows back to VRAM -->
+  <path d="M264 230 L40 230 L40 206" stroke="#c2410c" stroke-width="2.5" fill="none" marker-end="url(#t-ar)"/>
+  <text class="lbl" x="120" y="248">wake 0.59 s</text>
+
+  <path d="M560 268 L60 268 L60 206" stroke="#c2410c" stroke-width="2.5" fill="none" marker-end="url(#t-ar)"/>
+  <text class="lbl" x="270" y="286">wake 0.71 s</text>
+
+  <path d="M800 306 L80 306 L80 206" stroke="#94a3b8" stroke-width="2.5" fill="none" marker-end="url(#t-ar2)" stroke-dasharray="7 5"/>
+  <text class="tiny" x="380" y="324">cold start 35 s — the thing tiering exists to avoid</text>
+
+  <!-- punchline -->
+  <rect class="hot" x="24" y="344" width="912" height="66"/>
+  <text class="h"   x="48" y="372">Paging a model out and back costs under a second.</text>
+  <text class="sub" x="48" y="394">Loading it from scratch costs thirty-five. That is a 59x difference, measured on an RTX 3070 with Qwen2.5-0.5B.</text>
+</svg>
