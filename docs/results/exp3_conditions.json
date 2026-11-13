@@ -1,11 +1,11 @@
 {
   "experiment": 3,
-  "when": "2026-11-13 08:32:30",
+  "when": "2026-11-13 09:07:47",
   "duration": "3m",
   "users": 3,
-  "policies": "lru,cost-aware",
+  "policies": "cold,lru,lfu-decay,cost-aware,predictive-prewarm",
   "routers": "round-robin,least-loaded,prefix-aware,prefix-aware+load",
-  "traces": "zipf_s10",
+  "traces": "zipf_s10,bursty",
   "models": [
     [
       "q05a",

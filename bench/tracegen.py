@@ -233,6 +233,11 @@ def main() -> int:
     ap.add_argument("--rate", type=float, default=2.0, help="requests per second")
     ap.add_argument("--seed", type=int, default=20261113)
     ap.add_argument("--teams", default="team-a,team-b,team-c")
+    ap.add_argument("--only", default="",
+                    help="generate only this trace kind (steady, zipf, bursty, agent). "
+                         "Experiment 5 needs an agent trace addressing a single model "
+                         "with several replicas, which is a different fleet from the "
+                         "multi-model one experiment 3 uses.")
     ap.add_argument("--models", default="",
                     help="comma-separated model ids; defaults to the local fleet. Must match "
                          "the models the experiment deploys, or part of the trace addresses "
@@ -254,23 +259,33 @@ def main() -> int:
     base = {"seed": args.seed, "duration": args.duration, "rate": args.rate,
             "teams": teams, "models": models}
 
-    write(out, "steady", gen_steady(rng_for("steady"), models, args.duration, args.rate, teams),
-          {**base, "kind": "steady"})
+    want = (lambda kind: not args.only or args.only == kind)
 
-    for skew in (0.6, 1.0, 1.4):
-        name = f"zipf_s{skew}".replace(".", "")
-        write(out, name,
-              gen_zipf(rng_for(name), models, args.duration, args.rate, skew, teams),
-              {**base, "kind": "zipf", "skew": skew})
+    if want("steady"):
+        write(out, "steady", gen_steady(rng_for("steady"), models, args.duration, args.rate, teams),
+              {**base, "kind": "steady"})
 
-    write(out, "bursty", gen_bursty(rng_for("bursty"), models, args.duration, args.rate, teams),
-          {**base, "kind": "bursty", "phases": 4})
+    if want("zipf"):
+        for skew in (0.6, 1.0, 1.4):
+            name = f"zipf_s{skew}".replace(".", "")
+            write(out, name,
+                  gen_zipf(rng_for(name), models, args.duration, args.rate, skew, teams),
+                  {**base, "kind": "zipf", "skew": skew})
 
-    # Agent traffic is driven by session count rather than arrival rate, since its
-    # arrivals are produced by conversations rather than by a Poisson process.
-    sessions = max(8, int(args.duration / 25))
-    write(out, "agent", gen_agent(rng_for("agent"), models[:2], args.duration, sessions, teams),
-          {**base, "kind": "agent", "sessions": sessions, "models": models[:2]})
+    if want("bursty"):
+        write(out, "bursty", gen_bursty(rng_for("bursty"), models, args.duration, args.rate, teams),
+              {**base, "kind": "bursty", "phases": 4})
+
+    if want("agent"):
+        # Agent traffic is driven by session count rather than arrival rate, since its
+        # arrivals are produced by conversations rather than by a Poisson process.
+        sessions = max(8, int(args.duration / 25))
+        # Use every model given. Experiment 5 passes a single model and spreads it
+        # over several replicas, because the question there is which *replica* serves
+        # a conversation, not which model.
+        agent_models = models if args.only == "agent" else models[:2]
+        write(out, "agent", gen_agent(rng_for("agent"), agent_models, args.duration, sessions, teams),
+              {**base, "kind": "agent", "sessions": sessions, "models": agent_models})
 
     print(f"\nwrote {len(list(out.glob('*.jsonl')))} traces to {out}")
     return 0

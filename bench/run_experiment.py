@@ -604,8 +604,22 @@ def main() -> int:
             ("qwen-1.5b", "Qwen/Qwen2.5-1.5B-Instruct", 0.55),
         ]
 
-    RESULTS.mkdir(parents=True, exist_ok=True)
-    (RESULTS / "raw").mkdir(parents=True, exist_ok=True)
+    # WSL's 9p mount of /mnt/c serves stale directory metadata for a moment after a
+    # delete, so both mkdir(exist_ok=True) and a follow-up is_dir() can be wrong. The
+    # only reliable test is whether a write actually lands, and a run must not die
+    # before touching the GPU over a filesystem hiccup.
+    for d in (RESULTS, RESULTS / "raw", LOGS):
+        for attempt in range(10):
+            try:
+                d.mkdir(parents=True, exist_ok=True)
+                probe = d / ".writable"
+                probe.write_text("ok")
+                probe.unlink()
+                break
+            except OSError:
+                if attempt == 9:
+                    raise
+                time.sleep(0.3)
 
     started = time.time()
     EXPERIMENTS[args.experiment](Bench(args))
